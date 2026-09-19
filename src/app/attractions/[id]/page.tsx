@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AttractionMap, hasValidCoordinates } from "@/components/attraction-map";
+import { DistanceFromMe } from "@/components/distance-from-me";
 import { RoadsideCard, RoadsideCardSkeleton } from "@/components/roadside-card";
 import { WeatherCard, WeatherCardSkeleton } from "@/components/weather-card";
 import { CATEGORIES, getAttraction, htmlToText, toExternalUrl } from "@/lib/attractions";
@@ -125,6 +126,7 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
             <AttractionMap latitude={a.latitude!} longitude={a.longitude!} name={a.att_name_th} />
           )}
           <dl className="space-y-3">
+            {hasMap && <DistanceFromMe target={{ latitude: a.latitude!, longitude: a.longitude! }} />}
             {info
               .filter(([, v]) => v)
               .map(([label, value]) => (

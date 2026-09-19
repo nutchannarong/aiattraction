@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Noto_Sans_Thai } from "next/font/google";
+import { UserMenu } from "@/components/user-menu";
 import "./globals.css";
 
 const notoThai = Noto_Sans_Thai({
@@ -18,10 +19,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="th" className={`${notoThai.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <header className="border-b border-border bg-surface">
-          <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
             <Link href="/" className="text-lg font-semibold">
               AI Attraction
             </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/nearby" className="text-sm hover:text-accent">
+                ใกล้ฉัน
+              </Link>
+              <UserMenu />
+            </div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>

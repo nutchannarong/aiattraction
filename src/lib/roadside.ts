@@ -1,5 +1,7 @@
 import { getSupabase } from "./supabase";
 
+export { formatDistance } from "./geo";
+
 // Fuel stations and rest stops from OpenStreetMap, stored in public.roadside_poi.
 
 export type RoadsidePoi = {
@@ -33,10 +35,6 @@ export async function getNearbyRoadside(latitude: number, longitude: number) {
     restStops: items.filter((p) => p.kind !== "fuel"),
     radiusKm: SEARCH_RADIUS_M / 1000,
   };
-}
-
-export function formatDistance(meters: number) {
-  return meters < 1000 ? `${meters} ม.` : `${(meters / 1000).toFixed(1)} กม.`;
 }
 
 export function directionsUrl(latitude: number, longitude: number) {

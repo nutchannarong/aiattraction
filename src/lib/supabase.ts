@@ -4,7 +4,7 @@ let client: SupabaseClient | undefined;
 
 // Only server components query Supabase, so server-only names are preferred.
 // These match what the Vercel Supabase integration sets; NEXT_PUBLIC_* is a fallback.
-function readEnv() {
+export function readEnv() {
   const env = process.env;
   return {
     url: env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL,
