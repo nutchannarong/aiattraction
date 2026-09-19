@@ -310,7 +310,7 @@ export function AttractionResultsMap({
                     <button
                       type="button"
                       className="text-xs text-muted underline"
-                      onClick={() => onToggleStop(stop)}
+                      onClick={() => toggleRouteStop(stop)}
                     >
                       เอาออก
                     </button>

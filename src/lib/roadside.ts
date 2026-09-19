@@ -18,12 +18,17 @@ export type RoadsidePoi = {
 const SEARCH_RADIUS_M = 30000;
 const PER_KIND = 5;
 
-export async function getNearbyRoadside(latitude: number, longitude: number) {
+export async function getNearbyRoadside(
+  latitude: number,
+  longitude: number,
+  radiusM = SEARCH_RADIUS_M,
+  perKind = PER_KIND,
+) {
   const { data, error } = await getSupabase().rpc("nearby_roadside_poi", {
     lat: latitude,
     lng: longitude,
-    radius_m: SEARCH_RADIUS_M,
-    per_kind: PER_KIND,
+    radius_m: radiusM,
+    per_kind: perKind,
   });
   if (error) {
     console.error("nearby_roadside_poi failed:", error.message);
@@ -33,7 +38,7 @@ export async function getNearbyRoadside(latitude: number, longitude: number) {
   return {
     fuel: items.filter((p) => p.kind === "fuel"),
     restStops: items.filter((p) => p.kind !== "fuel"),
-    radiusKm: SEARCH_RADIUS_M / 1000,
+    radiusKm: radiusM / 1000,
   };
 }
 
