@@ -1,10 +1,12 @@
 "use client";
 
-import {
-  AttractionResultsMap,
-  type MapAttraction,
-  type RoutePoi,
-} from "@/components/attraction-map";
+import dynamic from "next/dynamic";
+import type { MapAttraction, RoutePoi } from "@/components/attraction-map";
+
+const RouteMapCanvas = dynamic(
+  () => import("./leaflet-map").then((module) => module.AttractionResultsMap),
+  { ssr: false },
+);
 
 type Props = {
   attractions: MapAttraction[];
@@ -15,7 +17,7 @@ type Props = {
 /** Shared route map for journeys using the roadside POI data we have today. */
 export function RoutePlannerMap({ attractions, roadsidePois = [], className }: Props) {
   return (
-    <AttractionResultsMap
+    <RouteMapCanvas
       items={attractions}
       routePois={roadsidePois}
       showRoutePreview

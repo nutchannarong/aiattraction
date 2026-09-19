@@ -147,6 +147,12 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
               >
                 เปิดใน Google Maps
               </a>
+              <Link
+                href={`/map?destination=${encodeURIComponent(a.att_id)}`}
+                className="block rounded-lg border border-border px-4 py-2 text-center font-medium text-accent"
+              >
+                ดูตัวอย่างเส้นทาง
+              </Link>
             </div>
           )}
           {links.length > 0 && (
