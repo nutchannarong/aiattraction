@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAuthClient } from "@/lib/supabase-server";
 
-// Landing URL for the email confirmation link (PKCE code exchange).
+// Landing URL for email confirmation links and OAuth sign-in (PKCE code exchange).
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
@@ -12,10 +12,15 @@ export async function GET(request: NextRequest) {
     const supabase = await createAuthClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(`${origin}${next}`);
+    console.error("exchangeCodeForSession failed:", error.message);
   }
 
-  const params = new URLSearchParams({
-    error: "ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุ กรุณาเข้าสู่ระบบหรือสมัครใหม่อีกครั้ง",
-  });
+  // e.g. the user pressed "Cancel" on Google's consent screen.
+  const providerError = searchParams.get("error");
+  const message =
+    providerError === "access_denied"
+      ? "ยกเลิกการเข้าสู่ระบบแล้ว"
+      : "เข้าสู่ระบบไม่สำเร็จ หรือลิงก์หมดอายุ กรุณาลองใหม่อีกครั้ง";
+  const params = new URLSearchParams({ error: message, next });
   return NextResponse.redirect(`${origin}/login?${params}`);
 }

@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createAuthClient } from "@/lib/supabase-server";
+import { createAuthClient, isAuthProviderEnabled } from "@/lib/supabase-server";
 
 /** Only allow same-site relative paths to avoid open redirects. */
 function safeNext(value: FormDataEntryValue | null) {
@@ -12,6 +12,15 @@ function safeNext(value: FormDataEntryValue | null) {
 
 function loginUrl(params: Record<string, string>) {
   return `/login?${new URLSearchParams(params)}`;
+}
+
+async function getOrigin() {
+  const h = await headers();
+  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+}
+
+function callbackUrl(origin: string, next: string) {
+  return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 function readCredentials(formData: FormData) {
@@ -53,13 +62,11 @@ export async function signUp(formData: FormData) {
     redirect(loginUrl({ error: "กรุณากรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัวอักษร", email, next }));
   }
 
-  const h = await headers();
-  const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}` },
+    options: { emailRedirectTo: callbackUrl(await getOrigin(), next) },
   });
   if (error) redirect(loginUrl({ error: describeError(error), email, next }));
 
@@ -68,6 +75,25 @@ export async function signUp(formData: FormData) {
     redirect(loginUrl({ message: "สมัครสำเร็จ กรุณายืนยันอีเมลจากลิงก์ที่ส่งไปให้", email, next }));
   }
   redirect(next);
+}
+
+export async function signInWithGoogle(formData: FormData) {
+  const next = safeNext(formData.get("next"));
+  // signInWithOAuth only builds a URL; check first so users get a clear message
+  // instead of a raw JSON error page from Supabase.
+  if (!(await isAuthProviderEnabled("google"))) {
+    redirect(loginUrl({ error: "ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google กรุณาใช้อีเมลแทน", next }));
+  }
+
+  const supabase = await createAuthClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: callbackUrl(await getOrigin(), next) },
+  });
+  if (error || !data.url) {
+    redirect(loginUrl({ error: error ? describeError(error) : "เข้าสู่ระบบด้วย Google ไม่สำเร็จ", next }));
+  }
+  redirect(data.url);
 }
 
 export async function signOut() {

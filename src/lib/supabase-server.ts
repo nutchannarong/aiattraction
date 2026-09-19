@@ -35,3 +35,20 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!claims) return null;
   return { id: claims.sub, email: (claims.email as string | undefined) ?? null };
 }
+
+/** Whether an OAuth provider (e.g. "google") is switched on in Supabase Auth settings. */
+export async function isAuthProviderEnabled(provider: string): Promise<boolean> {
+  const { url, key } = readEnv();
+  if (!url || !key) return false;
+  try {
+    const res = await fetch(`${url}/auth/v1/settings`, {
+      headers: { apikey: key },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return false;
+    const settings = (await res.json()) as { external?: Record<string, boolean> };
+    return settings.external?.[provider] === true;
+  } catch {
+    return false;
+  }
+}

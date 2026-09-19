@@ -44,3 +44,19 @@ SQL ที่แอปต้องใช้ (สิทธิ์อ่านแ�
 set statement_timeout = 0;
 select public.import_roadside_poi();
 ```
+
+## เข้าสู่ระบบ (Supabase Auth)
+
+รองรับอีเมล/รหัสผ่าน และ Google ตั้งค่าครั้งเดียวดังนี้
+
+1. **Supabase → Authentication → URL Configuration**
+   - Site URL: `https://aiattraction.vercel.app`
+   - Redirect URLs: `https://aiattraction.vercel.app/auth/callback`, `http://localhost:3000/auth/callback`
+2. **Google Cloud Console → APIs & Services**
+   - OAuth consent screen: ตั้งชื่อแอปและอีเมลติดต่อ, User type = External, กด Publish app
+   - Credentials → Create credentials → OAuth client ID → Web application
+     - Authorized JavaScript origins: `https://aiattraction.vercel.app`
+     - Authorized redirect URIs: `https://mdbnwbrugxrzigevudob.supabase.co/auth/v1/callback`
+3. **Supabase → Authentication → Sign In / Providers → Google** เปิดใช้งาน แล้วใส่ Client ID และ Client Secret จากข้อ 2
+
+ถ้ายังไม่เปิด Google provider ปุ่ม "เข้าสู่ระบบด้วย Google" จะแจ้งให้ใช้อีเมลแทน

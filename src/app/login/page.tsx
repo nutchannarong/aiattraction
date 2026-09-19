@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { GoogleIcon } from "@/components/google-icon";
 import { getCurrentUser } from "@/lib/supabase-server";
-import { signIn, signUp } from "./actions";
+import { signIn, signInWithGoogle, signUp } from "./actions";
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
@@ -23,7 +24,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     <div className="mx-auto max-w-sm space-y-6 py-8">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">เข้าสู่ระบบ</h1>
-        <p className="text-sm text-muted">ใช้อีเมลเดิมเพื่อเข้าสู่ระบบ หรือสมัครสมาชิกใหม่</p>
+        <p className="text-sm text-muted">เข้าสู่ระบบด้วยบัญชี Google หรืออีเมล</p>
       </div>
 
       {error && (
@@ -39,6 +40,20 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           {message}
         </p>
       )}
+
+      <form action={signInWithGoogle}>
+        <input type="hidden" name="next" value={next} />
+        <button className="flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 font-medium hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent">
+          <GoogleIcon />
+          เข้าสู่ระบบด้วย Google
+        </button>
+      </form>
+
+      <div className="flex items-center gap-3 text-xs text-muted" role="separator">
+        <span className="h-px flex-1 bg-border" />
+        หรือใช้อีเมล
+        <span className="h-px flex-1 bg-border" />
+      </div>
 
       <form className="space-y-4 rounded-xl border border-border bg-surface p-5">
         <input type="hidden" name="next" value={next} />
