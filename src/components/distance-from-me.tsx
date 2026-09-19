@@ -9,7 +9,9 @@ export function DistanceFromMe({ target }: { target: Coordinates }) {
   const { state, locate } = useGeolocation();
 
   useEffect(() => {
-    isLocationGranted().then((granted) => granted && locate());
+    isLocationGranted().then((granted) => {
+      if (granted) void locate();
+    });
   }, [locate]);
 
   if (state.status === "ready") {
@@ -24,7 +26,7 @@ export function DistanceFromMe({ target }: { target: Coordinates }) {
   return (
     <div className="space-y-1">
       <button
-        onClick={locate}
+        onClick={() => void locate()}
         disabled={state.status === "locating"}
         className="text-accent underline-offset-2 hover:underline disabled:opacity-60"
       >
