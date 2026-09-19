@@ -6,14 +6,6 @@
 
 โลโก้ต้นฉบับอยู่ที่ `brand/logo-source.webp` ถ้าเปลี่ยนโลโก้ ให้รัน `node scripts/generate-brand-assets.mjs` เพื่อสร้าง favicon, ไอคอนแอป, ภาพแชร์ลิงก์ (OG image) และโลโก้บนเว็บใหม่
 
-## สถาปัตยกรรมระบบ (System Architecture)` ต่อจากย่อหน้าแนะนำโปรเจกต์ (ก่อน "เริ่มต้นใช้งาน") เนื้อหาเดิมไม่แตะ แผนภาพใช้ Mermaid ซึ่ง GitHub แสดงผลให้อัตโนมัติ
-
-หลังเขียนเสร็จ: commit แล้ว `git pull --rebase` ก่อน push ขึ้น `main`
-
----
-
-## เนื้อหาที่จะเพิ่มลง README (ร่าง)
-
 ## สถาปัตยกรรมระบบ (System Architecture)
 
 ### ภาพรวม
@@ -178,12 +170,13 @@ select public.import_roadside_poi();
 รองรับอีเมล/รหัสผ่าน และ Google ตั้งค่าครั้งเดียวดังนี้
 
 1. **Supabase → Authentication → URL Configuration**
-   - Site URL: `https://aiattraction.vercel.app`
-   - Redirect URLs: `https://aiattraction.vercel.app/auth/callback`, `http://localhost:3000/auth/callback`
+   - Site URL: `https://thainhaidee.vercel.app`
+   - Redirect URLs: `https://thainhaidee.vercel.app/**`, `http://localhost:3000/**`
+   - ถ้าเปลี่ยนโดเมนเมื่อไร ต้องเพิ่มโดเมนใหม่ในรายการนี้ด้วย ไม่อย่างนั้น Supabase จะส่งผู้ใช้กลับไปที่ Site URL แทน
 2. **Google Cloud Console → APIs & Services**
    - OAuth consent screen: ตั้งชื่อแอปและอีเมลติดต่อ, User type = External, กด Publish app
    - Credentials → Create credentials → OAuth client ID → Web application
-     - Authorized JavaScript origins: `https://aiattraction.vercel.app`
+     - Authorized JavaScript origins: `https://thainhaidee.vercel.app`
      - Authorized redirect URIs: `https://mdbnwbrugxrzigevudob.supabase.co/auth/v1/callback`
 3. **Supabase → Authentication → Sign In / Providers → Google** เปิดใช้งาน แล้วใส่ Client ID และ Client Secret จากข้อ 2
 

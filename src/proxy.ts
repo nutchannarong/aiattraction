@@ -4,6 +4,17 @@ import { readEnv } from "@/lib/supabase";
 
 // Refreshes the Supabase auth session cookie on every page request.
 export async function proxy(request: NextRequest) {
+  // If our redirect URL isn't in Supabase's allow list, Supabase falls back to the
+  // Site URL and the auth code lands on some other page. Hand it to the callback.
+  const { pathname, searchParams } = request.nextUrl;
+  const code = searchParams.get("code");
+  if (code && pathname !== "/auth/callback") {
+    const callback = new URL("/auth/callback", request.nextUrl.origin);
+    callback.searchParams.set("code", code);
+    callback.searchParams.set("next", pathname);
+    return NextResponse.redirect(callback);
+  }
+
   let response = NextResponse.next({ request });
   const { url, key } = readEnv();
   if (!url || !key) return response;
