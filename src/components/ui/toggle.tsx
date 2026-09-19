@@ -8,15 +8,23 @@ export function Toggle({
   hint,
   checked,
   onChange,
+  hideLabel = false,
 }: {
   label: string;
   hint?: string;
+  /** Keep the label for screen readers only (e.g. when the row already shows it). */
+  hideLabel?: boolean;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm">
-      <span>
+    <label
+      className={cn(
+        "flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm",
+        hideLabel && "min-h-0",
+      )}
+    >
+      <span className={hideLabel ? "sr-only" : undefined}>
         <span className="font-medium">{label}</span>
         {hint && <span className="block text-xs text-subtle">{hint}</span>}
       </span>
