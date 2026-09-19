@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { destinationAfterSignIn } from "@/lib/auth-redirect";
 import { createAuthClient } from "@/lib/supabase-server";
+import { recordAnalyticsEvent } from "@/lib/analytics";
 
 // Landing URL for email confirmation links and OAuth sign-in (PKCE code exchange).
 export async function GET(request: NextRequest) {
@@ -12,7 +13,10 @@ export async function GET(request: NextRequest) {
   if (code) {
     const supabase = await createAuthClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}${await destinationAfterSignIn(next)}`);
+    if (!error) {
+      await recordAnalyticsEvent("login");
+      return NextResponse.redirect(`${origin}${await destinationAfterSignIn(next)}`);
+    }
     console.error("exchangeCodeForSession failed:", error.message);
   }
 

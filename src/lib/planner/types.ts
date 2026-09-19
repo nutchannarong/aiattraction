@@ -111,6 +111,7 @@ export type PlannerDraft = {
   endDate: string;
   travelers: Travelers;
   occasion: Occasion | null;
+  travelPurpose?: "holiday" | "festival" | "homecoming" | "celebration" | "leisure" | null;
   /** place_groups keys */
   interests: string[];
   /** att_type ids chosen inside the interest groups; empty = whole group */

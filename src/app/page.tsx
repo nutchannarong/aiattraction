@@ -52,7 +52,7 @@ export default async function Home() {
       </section>
 
       <section>
-        <h2 className="hl mb-4 inline-block text-xl font-bold">วางแผนใน 4 ขั้น</h2>
+        <h2 className="hl mb-4 inline-block text-xl font-bold">วางแผนใน 4 ขั้นตอน</h2>
         <ol className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
             <li key={s.title}>

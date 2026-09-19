@@ -3,6 +3,8 @@ import { Anuphan, IBM_Plex_Mono, Noto_Serif_Thai } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
+import { ActivityTracker } from "@/components/activity-tracker";
+import { PublicHeader } from "@/components/public-header";
 
 const anuphan = Anuphan({ variable: "--font-anuphan", subsets: ["thai", "latin"] });
 const notoSerifThai = Noto_Serif_Thai({
@@ -36,7 +38,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col font-sans">
-        <SiteHeader />
+        <PublicHeader><SiteHeader /></PublicHeader>
+        <ActivityTracker />
         <main className="mx-auto w-full max-w-7xl flex-1 px-3.5 pb-20 pt-5 sm:px-5">{children}</main>
       </body>
     </html>
