@@ -81,7 +81,7 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
 
   return (
     <article className="space-y-6">
-      <Link href="/" className="text-sm text-accent">
+      <Link href="/attractions" className="text-sm text-accent">
         ← กลับไปหน้าค้นหา
       </Link>
 

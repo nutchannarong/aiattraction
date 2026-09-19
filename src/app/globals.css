@@ -1,54 +1,172 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* Theme follows data-theme on <html> (set before paint in layout.tsx from the saved
+   choice or the OS setting); the media query is only a no-JS fallback. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tokens from DESIGN.md §2 / §8.1. Text colours are the contrast-fixed values
+   (≥ 4.5:1); `brand` is the logo orange for non-text use (tape, route line, glow). */
 :root {
-  /* Brand: orange + turquoise from the ไทยไหนดี logo, darkened where needed for 4.5:1 text contrast. */
-  --background: #faf7f2;
+  --background: #fdf8f4;
   --surface: #ffffff;
-  --foreground: #1c1c1a;
-  --muted: #6b6660;
-  --border: #ebe5dc;
+  --surface-2: #f6f1ec;
+  --surface-3: #fdfaf7;
+  --foreground: #14161a;
+  --muted: #4a4f57;
+  --subtle: #6b7078;
+  --border: #e7dfd8;
+  --border-soft: #f1ece6;
+  --brand: #f4622e;
   --accent: #c8431a;
+  --accent-soft: #ffeadf;
+  --highlight: #ffc7a8;
   --secondary: #0f766e;
+  --secondary-soft: #dff5f2;
+  --info: #1f5f8f;
+  --info-soft: #e2eff9;
   --danger: #b91c1c;
-  --danger-soft: #fef2f2;
+  --danger-soft: #fae3dd;
+  --hard-ink: #14161a;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #101114;
+  --surface: #191b20;
+  --surface-2: #22252b;
+  --surface-3: #1d2026;
+  --foreground: #f5f2ee;
+  --muted: #b5b9bf;
+  --subtle: #868b93;
+  --border: #2e3239;
+  --border-soft: #25282e;
+  --brand: #ff7a48;
+  --accent: #ff7a48;
+  --accent-soft: #3a1a0d;
+  --highlight: #6b3216;
+  --secondary: #3fcbbd;
+  --secondary-soft: #0d2b28;
+  --info: #6bb0de;
+  --info-soft: #13283a;
+  --danger: #e4715a;
+  --danger-soft: #331812;
+  --hard-ink: rgb(0 0 0 / 60%);
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #141211;
-    --surface: #1e1b19;
-    --foreground: #eeeae6;
-    --muted: #a8a29e;
-    --border: #33302c;
-    --accent: #ff8a65;
-    --secondary: #2dd4bf;
-    --danger: #fca5a5;
-    --danger-soft: #450a0a;
+  :root:not([data-theme]) {
+    --background: #101114;
+    --surface: #191b20;
+    --surface-2: #22252b;
+    --surface-3: #1d2026;
+    --foreground: #f5f2ee;
+    --muted: #b5b9bf;
+    --subtle: #868b93;
+    --border: #2e3239;
+    --border-soft: #25282e;
+    --brand: #ff7a48;
+    --accent: #ff7a48;
+    --accent-soft: #3a1a0d;
+    --highlight: #6b3216;
+    --secondary: #3fcbbd;
+    --secondary-soft: #0d2b28;
+    --info: #6bb0de;
+    --info-soft: #13283a;
+    --danger: #e4715a;
+    --danger-soft: #331812;
+    --hard-ink: rgb(0 0 0 / 60%);
+    color-scheme: dark;
   }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-brand: var(--brand);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-highlight: var(--highlight);
   --color-secondary: var(--secondary);
+  --color-secondary-soft: var(--secondary-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --font-sans: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
+  --shadow-hard: 4px 4px 0 var(--hard-ink);
+  --shadow-hard-sm: 2px 2px 0 var(--hard-ink);
+  --shadow-active: 6px 6px 0 var(--brand);
+  --radius-card: 16px;
+  --font-sans: var(--font-anuphan), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-noto-serif-thai), Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  body {
+    background-color: var(--background);
+    /* Dotted paper (DESIGN.md §2.7). */
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in srgb, var(--foreground) 7%, transparent) 1px,
+      transparent 0
+    );
+    background-size: 14px 14px;
+    color: var(--foreground);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    outline: 2.5px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+/* Marker-pen highlight under a word or heading (DESIGN.md §3 .sect / hero em). */
+.hl {
+  background-image: linear-gradient(transparent 62%, var(--highlight) 62%, var(--highlight) 92%, transparent 92%);
 }
 
 .leaflet-container {
   z-index: 0;
-  font-family: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-anuphan), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Map pins: category colour disc with an SVG icon, ink border (sticker style). */
+.map-pin {
+  align-items: center;
+  border: 2px solid var(--hard-ink);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--hard-ink);
+  color: #fff;
+  display: flex;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
 }
 
 .route-poi-marker {

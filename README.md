@@ -59,7 +59,7 @@ flowchart LR
 - **การเข้าถึงข้อมูล:** query ทั้งหมดอยู่ใน `src/lib/` ใช้ Supabase client 2 แบบ
   - `getSupabase()` สำหรับข้อมูล public แบบอ่านอย่างเดียว ไม่มี session ใช้ client ตัวเดียวร่วมกัน
   - `createAuthClient()` สำหรับงานของผู้ใช้ สร้างใหม่ทุก request เพราะผูกกับ cookie ของผู้ใช้คนนั้น
-- **การค้นหาเชิงพื้นที่:** ใช้ RPC ใน Postgres (`nearby_attractions`, `nearby_roadside_poi`) ร่วมกับ GiST index ให้ฐานข้อมูลเรียงตามระยะทาง แทนการดึงข้อมูลทั้งหมดมาคำนวณในแอป
+- **การค้นหาเชิงพื้นที่:** ใช้ RPC ใน Postgres (`nearby_attractions`, `nearby_poi`, `poi_along_route`, `attractions_along_route`, `search_places`) ร่วมกับ GiST และ trigram index ให้ฐานข้อมูลเรียงตามระยะทาง แทนการดึงข้อมูลทั้งหมดมาคำนวณในแอป
 - **ข้อมูลภายนอก:**
   - สภาพอากาศเรียก API สดและ cache 30 นาทีต่อพื้นที่ราว 1 กม.
   - ปั๊มน้ำมันและจุดพักรถดึงมาเก็บในฐานข้อมูลล่วงหน้า (batch import) เพราะ Overpass ช้าและไม่เสถียรเกินกว่าจะเรียกทุกครั้งที่มีคนเปิดหน้า
@@ -80,9 +80,9 @@ erDiagram
     float8 latitude
     float8 longitude
   }
-  roadside_poi {
+  poi {
     text osm_id PK
-    text kind "fuel | rest_area | services"
+    text kind "restaurant | cafe | hotel | fuel | atm | ..."
     text name
     text brand
     geography location
@@ -95,7 +95,9 @@ erDiagram
 
 - `attraction` (ประมาณ 8,600 แถว) นำเข้าจากระบบภายนอก แอปจึงไม่แก้ column ของตารางนี้ ทำ spatial index แบบ expression บน latitude/longitude แทนการเพิ่ม column
 - view `attraction_type_options` และ `attraction_province_options` ใช้เป็นตัวเลือกในตัวกรอง (ตั้ง `security_invoker` ให้เคารพ RLS ของตารางต้นทาง)
-- `roadside_poi` (ประมาณ 10,300 แถว) นำเข้าจาก OSM ด้วยฟังก์ชัน `import_roadside_poi()` เรียกได้เฉพาะผู้ดูแล
+- `poi` (ประมาณ 91,000 แถว: ร้านอาหาร คาเฟ่ ที่พัก พิพิธภัณฑ์ ATM ร้านยา โรงพยาบาล ปั๊มน้ำมัน จุดพักรถ ที่จอดรถ ห้องน้ำ) นำเข้าจาก OSM ด้วย `import_poi(group)` เรียกได้เฉพาะผู้ดูแล
+- `provinces` (77 จังหวัด พร้อมธงเมืองรอง 55 จังหวัด), `place_groups` + `attraction_type_group` (13 หมวดพร้อมค่าความเหนื่อย), `admin_areas` (อำเภอ/ตำบลสำหรับค้นหา)
+- `profiles`, `trips`, `trip_days`, `trip_items`, `trip_bookings` เป็นข้อมูลของผู้ใช้ RLS ให้เห็นเฉพาะของตัวเอง
 - `auth.users` Supabase จัดการให้ ตอนนี้ยังไม่มีตารางข้อมูลของผู้ใช้เพิ่มเติม
 - migration ทั้งหมดอยู่ใน `supabase/migrations/`
 
@@ -103,7 +105,8 @@ erDiagram
 
 - **สิทธิ์ในฐานข้อมูล:** ทุกตารางเปิด RLS สิทธิ์ public เป็นอ่านอย่างเดียว (ต้องตั้งทั้ง policy และ `grant`) ไม่มีการเขียนจากฝั่ง public
 - **Key:** แอปใช้แค่ publishable key ไม่มี secret key อยู่ในโค้ดหรือ repo
-- **ฟังก์ชันของผู้ดูแล:** `import_roadside_poi` ถอนสิทธิ์ `execute` จาก anon และ authenticated แล้ว
+- **ฟังก์ชันของผู้ดูแล:** `import_poi` และ trigger `handle_new_user` ถอนสิทธิ์ `execute` จาก anon และ authenticated แล้ว
+- **ข้อมูลของผู้ใช้:** ตาราง trip ทุกตารางตรวจทั้ง `user_id` และว่าแถวแม่เป็นของผู้ใช้คนเดียวกัน (สร้างวันหรือรายการผูกกับทริปของคนอื่นไม่ได้)
 - **Redirect:** หลัง login redirect ได้เฉพาะ path ภายในเว็บ (กัน open redirect)
 - **ข้อมูลจากฐานข้อมูล:** ลิงก์ภายนอกผ่าน `toExternalUrl()` ก่อนใช้ HTML จากฐานข้อมูลแปลงเป็นข้อความธรรมดาด้วย `htmlToText()` ไม่ render เป็น HTML ตรง ๆ
 
@@ -156,13 +159,15 @@ SQL ที่แอปต้องใช้ (สิทธิ์อ่านแ�
 | --- | --- | --- |
 | แผนที่ | Google Maps embed | ใส่ `GOOGLE_MAPS_API_KEY` (ไม่บังคับ) เพื่อใช้ Maps Embed API |
 | สภาพอากาศ | [Open-Meteo](https://open-meteo.com/) | ไม่ต้องใช้ key, cache 30 นาที, ฟรีสำหรับการใช้งานที่ไม่ใช่เชิงพาณิชย์ |
-| ปั๊มน้ำมัน / จุดพักรถ | OpenStreetMap ผ่าน Overpass API | เก็บในตาราง `roadside_poi` (ODbL, © OpenStreetMap contributors) |
+| ร้านอาหาร ที่พัก ปั๊มน้ำมัน ATM ร้านยา ฯลฯ | OpenStreetMap ผ่าน Overpass API | เก็บในตาราง `poi` (ODbL, © OpenStreetMap contributors) |
+| ราคาน้ำมัน | ปตท. (`CurrentOilPrice` SOAP) ราคากรุงเทพฯ | cache 1 วัน ถ้าเรียกไม่ได้ใช้ราคาตั้งต้นและแจ้งผู้ใช้ |
 
-รีเฟรชข้อมูลปั๊มน้ำมันและจุดพักรถ (รันใน Supabase SQL Editor ใช้เวลาหลายนาที):
+รีเฟรชข้อมูล POI จาก OSM (รันใน Supabase SQL Editor ทีละกลุ่ม กลุ่มใหญ่ใช้เวลาหลายนาที ถ้า server ตอบ 429/504 ให้รอหรือเปลี่ยน endpoint):
 
 ```sql
 set statement_timeout = 0;
-select public.import_roadside_poi();
+select public.import_poi('car', 'https://overpass-api.de/api/interpreter');
+-- กลุ่มอื่น: food, lodging, museum, finance, health, amenities
 ```
 
 ## เข้าสู่ระบบ (Supabase Auth)

@@ -206,3 +206,12 @@ export async function getNearbyAttractions(
   // .returns<T>() doesn't type-check on rpc() with an untyped client.
   return ((data ?? []) as NearbyAttraction[]).map(withCleanNameEn);
 }
+
+/** Total number of attractions, for headline copy. */
+export const countAttractions = cache(async (): Promise<number> => {
+  const { count, error } = await getSupabase()
+    .from("attraction")
+    .select("att_id", { count: "exact", head: true });
+  if (error) throw new Error(`Failed to count attractions: ${error.message}`);
+  return count ?? 0;
+});

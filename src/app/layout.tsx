@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
-import { Noto_Sans_Thai } from "next/font/google";
-import { UserMenu } from "@/components/user-menu";
+import { Anuphan, IBM_Plex_Mono, Noto_Serif_Thai } from "next/font/google";
+import { SiteHeader } from "@/components/site-header";
+import { THEME_INIT_SCRIPT } from "@/components/theme-toggle";
 import "./globals.css";
 
-const notoThai = Noto_Sans_Thai({
-  variable: "--font-noto-thai",
+const anuphan = Anuphan({ variable: "--font-anuphan", subsets: ["thai", "latin"] });
+const notoSerifThai = Noto_Serif_Thai({
+  variable: "--font-noto-serif-thai",
   subsets: ["thai", "latin"],
+  weight: ["600", "700", "800"],
 });
+const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["500", "600"] });
 
 const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -16,34 +18,26 @@ const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: { default: "ไทยไหนดี — ค้นหาที่เที่ยวทั่วไทย", template: "%s · ไทยไหนดี" },
+  title: { default: "ไทยไหนดี — วางเส้นทางเที่ยวให้ตรงกับคนที่ไปด้วย", template: "%s · ไทยไหนดี" },
   description:
-    "ค้นหาแหล่งท่องเที่ยวทั่วประเทศไทย พร้อมแผนที่ สภาพอากาศ ปั๊มน้ำมันและจุดแวะพักรถใกล้เคียง",
+    "วางแผนขับรถเที่ยวทั่วไทยจากข้อมูล ททท. เลือกเส้นทาง จุดแวะ ที่พัก คำนวณค่าน้ำมันและค่าใช้จ่าย พร้อมแผนรายวัน",
   applicationName: "ไทยไหนดี",
   openGraph: { siteName: "ไทยไหนดี", locale: "th_TH", type: "website" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="th" className={`${notoThai.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">
-        <header className="border-b border-border bg-surface">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-              <Image src="/brand-mark.png" alt="" width={40} height={40} priority />
-              <span>
-                ไทย<span className="text-accent">ไหนดี</span>
-              </span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/nearby" className="text-sm hover:text-accent">
-                ใกล้ฉัน
-              </Link>
-              <UserMenu />
-            </div>
-          </div>
-        </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+    <html
+      lang="th"
+      suppressHydrationWarning
+      className={`${anuphan.variable} ${notoSerifThai.variable} ${plexMono.variable} h-full antialiased`}
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="flex min-h-full flex-col font-sans">
+        <SiteHeader />
+        <main className="mx-auto w-full max-w-7xl flex-1 px-3.5 pb-20 pt-5 sm:px-5">{children}</main>
       </body>
     </html>
   );
