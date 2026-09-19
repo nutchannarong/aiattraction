@@ -20,6 +20,7 @@ import {
   insertByTime,
   moveItem,
   nextStart,
+  orderDayItems,
   placeBefore,
   replaceItem,
   updateDay,
@@ -115,7 +116,9 @@ export function DayEditor({
   };
   const dayOf = (index: number) => plan.days.find((d) => d.index === index) ?? plan.days[0];
   const edit = (dayIndex: number, fn: (day: DayPlan) => DayPlan) =>
-    onChange(updateDay(plan, dayIndex, fn));
+    onChange(
+      updateDay(plan, dayIndex, (day) => orderDayItems(fn(orderDayItems(day)))),
+    );
   const dayOptions = plan.days.map((d) => ({
     index: d.index,
     label: `วันที่ ${d.index + 1} · ${formatThaiDate(d.date)}`,
@@ -126,7 +129,8 @@ export function DayEditor({
 
   return (
     <div className="space-y-5">
-      {plan.days.map((day) => {
+      {plan.days.map((sourceDay) => {
+        const day = orderDayItems(sourceDay);
         const hasLodging = day.items.some((i) => i.kind === "lodging");
         const needsLodging = day.index < plan.days.length - 1 && !hasLodging;
         return (
@@ -193,6 +197,9 @@ export function DayEditor({
                 {needsLodging && (
                   <span className="text-xs font-semibold text-danger">ยังไม่มีที่พักคืนนี้</span>
                 )}
+                <span className="text-xs text-subtle">
+                  รายการที่มีเวลาจะเรียงอัตโนมัติ · แก้เวลาเพื่อเปลี่ยนลำดับ
+                </span>
               </div>
             )}
 
@@ -207,7 +214,7 @@ export function DayEditor({
                   key={item.id}
                   item={item}
                   actions={
-                    day.finished ? null : (
+                    day.finished || item.kind === "drive" ? null : (
                       <div className="flex flex-wrap gap-1">
                         <button
                           type="button"
@@ -224,34 +231,36 @@ export function DayEditor({
                         >
                           <Pencil className="size-4" aria-hidden="true" />
                         </button>
-                        {item.kind !== "drive" && (
-                          <button
-                            type="button"
-                            className={`${iconButton} w-auto gap-1 px-2 text-xs font-semibold`}
-                            title="หาที่ใกล้เคียงแทน เช่น เมื่อร้านปิด"
-                            onClick={() => setLocal({ type: "replan", dayIndex: day.index, item })}
-                          >
-                            <Shuffle className="size-4" aria-hidden="true" /> เปลี่ยนแผน
-                          </button>
+                        <button
+                          type="button"
+                          className={`${iconButton} w-auto gap-1 px-2 text-xs font-semibold`}
+                          title="หาที่ใกล้เคียงแทน เช่น เมื่อร้านปิด"
+                          onClick={() => setLocal({ type: "replan", dayIndex: day.index, item })}
+                        >
+                          <Shuffle className="size-4" aria-hidden="true" /> เปลี่ยนแผน
+                        </button>
+                        {!item.start && (
+                          <>
+                            <button
+                              type="button"
+                              className={iconButton}
+                              aria-label="เลื่อนขึ้น"
+                              disabled={idx === 0}
+                              onClick={() => edit(day.index, (d) => moveItem(d, item.id, -1))}
+                            >
+                              <ArrowUp className="size-4" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              className={iconButton}
+                              aria-label="เลื่อนลง"
+                              disabled={idx === day.items.length - 1}
+                              onClick={() => edit(day.index, (d) => moveItem(d, item.id, 1))}
+                            >
+                              <ArrowDown className="size-4" aria-hidden="true" />
+                            </button>
+                          </>
                         )}
-                        <button
-                          type="button"
-                          className={iconButton}
-                          aria-label="เลื่อนขึ้น"
-                          disabled={idx === 0}
-                          onClick={() => edit(day.index, (d) => moveItem(d, item.id, -1))}
-                        >
-                          <ArrowUp className="size-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className={iconButton}
-                          aria-label="เลื่อนลง"
-                          disabled={idx === day.items.length - 1}
-                          onClick={() => edit(day.index, (d) => moveItem(d, item.id, 1))}
-                        >
-                          <ArrowDown className="size-4" aria-hidden="true" />
-                        </button>
                         <button
                           type="button"
                           className={`${iconButton} text-danger`}

@@ -1,9 +1,12 @@
 "use server";
 
 import { z } from "zod";
+import { toGeoJsonLine } from "@/lib/geo";
+import { getPlaceGroups } from "@/lib/place-groups";
 import { buildTripPlan, PlanError } from "@/lib/planner/build";
 import type { TripPlan } from "@/lib/planner/plan-types";
-import type { PlannerDraft } from "@/lib/planner/types";
+import type { PlaceGroupOption, PlannerDraft } from "@/lib/planner/types";
+import { getSupabase } from "@/lib/supabase";
 
 const lat = z.number().min(4).max(22);
 const lng = z.number().min(96).max(107);
@@ -25,10 +28,13 @@ const draftSchema = z
       adultAges: z.array(z.enum(["18-22", "23-30", "31-45", "46-59"])).max(4),
     }),
     occasion: z.enum(["couple", "friends", "family", "parents", "solo"]).nullable(),
-    interests: z.array(z.string().max(20)).max(13),
+    interests: z.array(z.string().max(20)).min(1, "เลือกแนวท่องเที่ยวอย่างน้อย 1 แนว").max(13),
     interestTypes: z.array(z.int()).max(100),
     balanced: z.boolean(),
-    stopKinds: z.array(z.string().max(20)).max(20),
+    stopKinds: z
+      .array(z.string().max(20))
+      .min(1, "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ")
+      .max(20),
     vehicle: z
       .object({
         type: z.enum(["motorcycle", "eco_car", "sedan", "suv", "pickup", "van", "bus"]),
@@ -43,12 +49,95 @@ const draftSchema = z
   })
   .loose()
   .refine((d) => d.endDate >= d.startDate, "วันกลับต้องไม่ก่อนวันออกเดินทาง")
+  .refine((d) => {
+    const start = new Date(`${d.startDate}T00:00:00Z`).getTime();
+    const end = new Date(`${d.endDate}T00:00:00Z`).getTime();
+    return Math.round((end - start) / 86400000) + 1 <= 14;
+  }, "เลือกช่วงเดินทางไม่เกิน 14 วัน")
   .refine(
     (d) => d.travelers.adults + d.travelers.children + d.travelers.seniors > 0,
     "ต้องมีผู้เดินทางอย่างน้อย 1 คน",
-  );
+  )
+  .refine(
+    (d) => d.travelers.adults === 0 || d.travelers.adultAges.length > 0,
+    "เลือกช่วงวัยของผู้ใหญ่",
+  )
+  .refine((d) => d.occasion !== null, "เลือกโอกาสในการเดินทาง")
+  .refine((d) => d.vehicle.fuelPrice > 0, "ใส่ราคาน้ำมัน");
 
 export type DraftPlanResult = { plan: TripPlan } | { error: string };
+
+type RouteGroupRow = {
+  att_type: number;
+  group_key: string;
+  province_name_th: string | null;
+  route_fraction: number | null;
+};
+
+export type RoutePlaceGroupsResult =
+  | { groups: PlaceGroupOption[]; provinces: string[]; total: number }
+  | { error: string };
+
+/** Counts themes inside a 50 km geographic corridor between the two selected points. */
+export async function findRoutePlaceGroups(input: {
+  origin: { latitude: number; longitude: number };
+  destination: { latitude: number; longitude: number };
+}): Promise<RoutePlaceGroupsResult> {
+  const parsed = z
+    .object({
+      origin: z.object({ latitude: lat, longitude: lng }),
+      destination: z.object({ latitude: lat, longitude: lng }),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: "พิกัดต้นทางหรือปลายทางไม่ถูกต้อง" };
+
+  try {
+    const route: [number, number][] = [
+      [parsed.data.origin.latitude, parsed.data.origin.longitude],
+      [parsed.data.destination.latitude, parsed.data.destination.longitude],
+    ];
+    const { data, error } = await getSupabase().rpc("attractions_along_route", {
+      route: toGeoJsonLine(route),
+      groups: null,
+      buffer_m: 50000,
+      max_results: 500,
+    });
+    if (error) throw error;
+
+    const rows = (data ?? []) as RouteGroupRow[];
+    const base = await getPlaceGroups();
+    const groupCounts = new Map<string, number>();
+    const typeCounts = new Map<number, number>();
+    const provinceProgress = new Map<string, number>();
+    for (const row of rows) {
+      groupCounts.set(row.group_key, (groupCounts.get(row.group_key) ?? 0) + 1);
+      typeCounts.set(row.att_type, (typeCounts.get(row.att_type) ?? 0) + 1);
+      if (row.province_name_th) {
+        provinceProgress.set(
+          row.province_name_th,
+          Math.min(provinceProgress.get(row.province_name_th) ?? 1, row.route_fraction ?? 1),
+        );
+      }
+    }
+    const groups = base
+      .map((group) => ({
+        ...group,
+        total: groupCounts.get(group.key) ?? 0,
+        types: group.types
+          .map((type) => ({ ...type, total: typeCounts.get(type.id) ?? 0 }))
+          .filter((type) => type.total > 0)
+          .toSorted((a, b) => b.total - a.total),
+      }))
+      .filter((group) => group.total > 0);
+    const provinces = [...provinceProgress.entries()]
+      .toSorted((a, b) => a[1] - b[1])
+      .map(([province]) => province);
+    return { groups, provinces, total: rows.length };
+  } catch (error) {
+    console.error("findRoutePlaceGroups failed:", error);
+    return { error: "กรองแนวท่องเที่ยวตามพื้นที่ระหว่างทางไม่สำเร็จ กรุณาลองใหม่" };
+  }
+}
 
 export async function draftTripPlan(input: PlannerDraft): Promise<DraftPlanResult> {
   const parsed = draftSchema.safeParse(input);

@@ -3,11 +3,13 @@
 import { RotateCcw, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { StepSection } from "@/components/ui/step-section";
 import type { FuelPrice } from "@/lib/fuel";
 import type { PlaceGroupOption, PlaceRef, PlannerDraft } from "@/lib/planner/types";
 import {
   interestsSummary,
+  daysBetween,
   StepInterests,
   StepStops,
   StepVehicle,
@@ -30,13 +32,36 @@ export type PlannerProps = {
   homeProvince: PlaceRef | null;
 };
 
+/** What blocks an individual planner step, in Thai, or null when complete. */
+export function missingForStep(d: PlannerDraft, step: number): string | null {
+  if (step === 1) {
+    if (!d.origin) return "เลือกจุดออกเดินทาง";
+    if (!d.destination) return "เลือกจุดหมายปลายทาง";
+    const days = daysBetween(d.startDate, d.endDate);
+    if (days < 1) return "วันกลับต้องไม่ก่อนวันออกเดินทาง";
+    if (days > 14) return "เลือกช่วงเดินทางไม่เกิน 14 วัน";
+  }
+  if (step === 2) {
+    if (d.travelers.adults + d.travelers.children + d.travelers.seniors === 0)
+      return "ใส่จำนวนผู้เดินทางอย่างน้อย 1 คน";
+    if (d.travelers.adults > 0 && d.travelers.adultAges.length === 0)
+      return "เลือกช่วงวัยของผู้ใหญ่";
+    if (!d.occasion) return "เลือกโอกาสในการเดินทาง";
+  }
+  if (step === 3 && d.interests.length === 0)
+    return "เลือกแนวท่องเที่ยวอย่างน้อย 1 แนว";
+  if (step === 4 && d.stopKinds.length === 0)
+    return "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ";
+  if (step === 5 && !(d.vehicle.fuelPrice > 0)) return "ใส่ราคาน้ำมัน";
+  return null;
+}
+
 /** What still blocks drafting a plan, in Thai, or null when ready. */
 export function missingForPlan(d: PlannerDraft): string | null {
-  if (!d.origin) return "เลือกจุดออกเดินทาง";
-  if (!d.destination) return "เลือกจุดหมายปลายทาง";
-  if (d.travelers.adults + d.travelers.children + d.travelers.seniors === 0)
-    return "ใส่จำนวนผู้เดินทาง";
-  if (!(d.vehicle.fuelPrice > 0)) return "ใส่ราคาน้ำมัน";
+  for (let step = 1; step <= 5; step += 1) {
+    const missing = missingForStep(d, step);
+    if (missing) return missing;
+  }
   return null;
 }
 
@@ -48,6 +73,7 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const missing = missingForPlan(draft);
+  const stepErrors = [1, 2, 3, 4, 5].map((step) => missingForStep(draft, step));
 
   const compute = (d: PlannerDraft) => {
     setRequested(d);
@@ -93,25 +119,48 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
   return (
     <div className="space-y-6">
       <div className="grid gap-3">
-        {steps.map((s, i) => (
-          <StepSection
-            key={s.title}
-            n={i + 1}
-            title={s.title}
-            summary={s.summary}
-            open={open === i + 1}
-            onToggle={() => setOpen(open === i + 1 ? null : i + 1)}
-          >
-            {s.body}
-            {i < steps.length - 1 && (
-              <div className="mt-4 flex justify-end">
-                <Button variant="ghost" onClick={() => setOpen(i + 2)}>
-                  ขั้นถัดไป: {steps[i + 1].title}
-                </Button>
-              </div>
-            )}
-          </StepSection>
-        ))}
+        {steps.map((s, i) => {
+          const lockedBy = stepErrors.slice(0, i).find(Boolean);
+          const error = stepErrors[i];
+          return (
+            <StepSection
+              key={s.title}
+              n={i + 1}
+              title={s.title}
+              summary={s.summary}
+              open={!lockedBy && open === i + 1}
+              disabled={Boolean(lockedBy)}
+              disabledReason={lockedBy ? `กรอกขั้นก่อนหน้าให้ครบ: ${lockedBy}` : undefined}
+              onToggle={() => setOpen(open === i + 1 ? null : i + 1)}
+            >
+              {s.body}
+              {i < steps.length - 1 && (
+                <div className="planner-step-actions mt-4">
+                  {error ? (
+                    <Callout tone="danger" className="w-full min-w-0">
+                      ยังขาด: {error}
+                    </Callout>
+                  ) : (
+                    <span />
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="justify-self-end"
+                    disabled={Boolean(error)}
+                    onClick={() => setOpen(i + 2)}
+                  >
+                    ขั้นถัดไป: {steps[i + 1].title}
+                  </Button>
+                </div>
+              )}
+              {i === steps.length - 1 && error && (
+                <Callout tone="danger" className="mt-4">
+                  ยังขาด: {error}
+                </Callout>
+              )}
+            </StepSection>
+          );
+        })}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border-2 border-foreground bg-surface px-4 py-3.5 shadow-hard">

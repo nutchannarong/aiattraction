@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
+import { getMyTrip } from "@/lib/trips-server";
 import { LiveView } from "./live-view";
 
 export const metadata: Metadata = { title: "กำลังเดินทาง" };
 
-export default function LivePage() {
+export default async function LivePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trip?: string }>;
+}) {
+  const { trip: tripId } = await searchParams;
+  const trip = tripId ? await getMyTrip(tripId) : null;
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-card border-2 border-foreground bg-surface shadow-hard">
@@ -27,7 +34,7 @@ export default function LivePage() {
           </p>
         </div>
       </section>
-      <LiveView />
+      <LiveView initialTrip={trip} />
     </div>
   );
 }

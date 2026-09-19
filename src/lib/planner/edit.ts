@@ -39,10 +39,36 @@ export function replaceItem(day: DayPlan, item: PlanItem): DayPlan {
   return { ...day, items: day.items.map((i) => (i.id === item.id ? item : i)) };
 }
 
+/** Timed itinerary rows are chronological; untimed rows retain their manual order at the end. */
+export function orderDayItems(day: DayPlan): DayPlan {
+  const items = day.items
+    .map((item, index) => ({ item, index, minutes: minutesOf(item.start) }))
+    .toSorted((a, b) => {
+      if (a.minutes == null && b.minutes == null) return a.index - b.index;
+      if (a.minutes == null) return 1;
+      if (b.minutes == null) return -1;
+      return a.minutes - b.minutes || a.index - b.index;
+    })
+    .map(({ item }) => item);
+  return { ...day, items };
+}
+
+export function orderTripItems(plan: TripPlan): TripPlan {
+  return { ...plan, days: plan.days.map(orderDayItems) };
+}
+
 export function moveItem(day: DayPlan, id: string, delta: -1 | 1): DayPlan {
   const i = day.items.findIndex((x) => x.id === id);
-  const j = i + delta;
-  if (i < 0 || j < 0 || j >= day.items.length) return day;
+  const item = day.items[i];
+  // Drive rows and timed rows are generated/positioned by the schedule, not manually reordered.
+  if (!item || item.kind === "drive" || item.start) return day;
+  const candidates = day.items
+    .map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate }) => candidate.kind !== "drive" && !candidate.start);
+  const current = candidates.findIndex(({ index }) => index === i);
+  const target = candidates[current + delta];
+  if (current < 0 || !target) return day;
+  const j = target.index;
   const items = [...day.items];
   [items[i], items[j]] = [items[j], items[i]];
   return { ...day, items };
@@ -69,7 +95,7 @@ export function nextStart(day: DayPlan, index = day.items.length - 1): string {
 
 /** Start of the first free slot of at least `minutes` between timed items (else after the last). */
 export function firstGap(day: DayPlan, minutes = 60): string {
-  const timed = day.items.filter((i) => i.start);
+  const timed = orderDayItems(day).items.filter((i) => i.start);
   for (let k = 0; k < timed.length - 1; k++) {
     const end = minutesOf(timed[k].end ?? timed[k].start);
     const next = minutesOf(timed[k + 1].start);

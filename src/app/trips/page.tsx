@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { getMyTripSummaries } from "@/lib/trips-server";
 import { NewTripButton } from "./new-trip-button";
 import { TripsView } from "./trips-view";
 
 export const metadata: Metadata = { title: "แผนของฉัน" };
 
-export default function TripsPage() {
+export default async function TripsPage() {
+  const trips = await getMyTripSummaries();
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-card border-2 border-foreground bg-surface shadow-hard">
@@ -28,7 +30,7 @@ export default function TripsPage() {
           </p>
         </div>
       </section>
-      <TripsView />
+      <TripsView initialTrips={trips} />
       <div className="flex justify-center pt-2">
         <NewTripButton />
       </div>

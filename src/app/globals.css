@@ -207,3 +207,30 @@
 .leaflet-container a.leaflet-popup-close-button {
   color: var(--subtle);
 }
+
+/* Keep step validation and its next button together even when browser zoom makes
+   a desktop window narrower in CSS pixels. Only compact phone widths stack them. */
+.planner-step-actions {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+
+.planner-step-actions > :first-child {
+  min-width: 0;
+  width: 100%;
+}
+
+.planner-step-actions > button {
+  justify-self: end;
+  max-width: 100%;
+  width: max-content;
+}
+
+@media (min-width: 480px) {
+  .planner-step-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

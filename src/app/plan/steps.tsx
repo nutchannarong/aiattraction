@@ -1,7 +1,17 @@
 "use client";
 
-import { Bike, Bus, Car, CarFront, Caravan, Truck, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  Bike,
+  Bus,
+  Car,
+  CarFront,
+  Caravan,
+  Loader2,
+  MapPin,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Callout } from "@/components/ui/callout";
 import { Chip } from "@/components/ui/chip";
 import { StepGroup } from "@/components/ui/step-section";
@@ -20,6 +30,8 @@ import {
   type VehicleType,
 } from "@/lib/planner/types";
 import { estimateEfficiency, VEHICLE_TYPES, vehicleTypeInfo } from "@/lib/planner/vehicles";
+import { findRoutePlaceGroups, type RoutePlaceGroupsResult } from "./actions";
+import { DateRangeCalendar } from "./date-range-calendar";
 import { PlacePicker } from "./place-picker";
 
 type StepProps = {
@@ -73,40 +85,17 @@ export function StepWhere({
         />
       </div>
       <StepGroup title="วันเดินทาง">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">ออกเดินทาง</span>
-            <input
-              type="date"
-              className={field}
-              min={today}
-              value={draft.startDate}
-              onChange={(e) => {
-                const startDate = e.target.value;
-                if (!startDate) return;
-                patch({
-                  startDate,
-                  endDate: draft.endDate < startDate ? startDate : draft.endDate,
-                });
-              }}
-            />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">เดินทางกลับ</span>
-            <input
-              type="date"
-              className={field}
-              min={draft.startDate}
-              value={draft.endDate}
-              onChange={(e) => e.target.value && patch({ endDate: e.target.value })}
-            />
-          </label>
-        </div>
-        <p className="mt-2 text-xs text-subtle">
-          รวม <span className="font-mono">{days}</span> วัน{" "}
-          <span className="font-mono">{Math.max(0, days - 1)}</span> คืน
-          {days > 14 && " · แผนยาวเกิน 14 วัน ระบบจะจัดตารางให้ 14 วันแรก"}
-        </p>
+        <DateRangeCalendar
+          start={draft.startDate}
+          end={draft.endDate}
+          today={today}
+          onChange={({ startDate, endDate }) => patch({ startDate, endDate })}
+        />
+        {days > 14 && (
+          <p className="mt-2 text-xs font-semibold text-danger">
+            เลือกช่วงเดินทางไม่เกิน 14 วันก่อนดำเนินการต่อ
+          </p>
+        )}
       </StepGroup>
     </>
   );
@@ -215,11 +204,66 @@ export function StepInterests({
   groups,
 }: StepProps & { groups: PlaceGroupOption[] }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [routeResult, setRouteResult] = useState<{
+    key: string;
+    result: RoutePlaceGroupsResult;
+  } | null>(null);
+  const origin = draft.origin;
+  const destination = draft.destination;
+  const routeKey =
+    origin && destination
+      ? `${origin.latitude.toFixed(4)},${origin.longitude.toFixed(4)}:${destination.latitude.toFixed(4)},${destination.longitude.toFixed(4)}`
+      : null;
+
+  useEffect(() => {
+    if (!routeKey || !origin || !destination) return;
+    let cancelled = false;
+    findRoutePlaceGroups({ origin, destination }).then((result) => {
+      if (!cancelled) setRouteResult({ key: routeKey, result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [routeKey, origin, destination]);
+
+  const current = routeResult?.key === routeKey ? routeResult.result : null;
+  const filteredGroups = useMemo(
+    () => (current && "groups" in current ? current.groups : routeKey ? [] : groups),
+    [current, groups, routeKey],
+  );
   return (
     <>
       <StepGroup title="ไปแนวไหน — เลือกได้หลายแนว">
+        {!routeKey && (
+          <div className="mb-3 rounded-lg bg-info-soft px-3 py-2 text-xs text-info">
+            เลือกต้นทางและปลายทางก่อน ระบบจะแสดงเฉพาะแนวท่องเที่ยวที่พบในพื้นที่ระหว่างทาง
+          </div>
+        )}
+        {routeKey && !current && (
+          <p className="mb-3 flex items-center gap-2 text-sm text-muted" aria-live="polite">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            กำลังกรองจังหวัดและสถานที่ใกล้แนวเดินทาง…
+          </p>
+        )}
+        {current && "error" in current && (
+          <Callout tone="danger" className="mb-3">{current.error}</Callout>
+        )}
+        {current && "groups" in current && (
+          <div className="mb-3 rounded-lg bg-secondary-soft px-3 py-2 text-xs text-secondary">
+            <p className="flex items-start gap-1.5 font-semibold">
+              <MapPin className="mt-0.5 size-3.5 flex-none" aria-hidden="true" />
+              กรองจากพื้นที่ใกล้แนวเดินทาง 50 กม. · พบ{current.total >= 500 ? "อย่างน้อย " : " "}
+              {current.total.toLocaleString("th-TH")} แห่ง
+            </p>
+            {current.provinces.length > 0 && (
+              <p className="mt-1 text-[11px] opacity-85">
+                จังหวัดที่พบ: {current.provinces.join(" · ")}
+              </p>
+            )}
+          </div>
+        )}
         <div className="space-y-2">
-          {groups.map((g) => {
+          {filteredGroups.map((g) => {
             const on = draft.interests.includes(g.key);
             const picked = g.types.filter((t) => draft.interestTypes.includes(t.id)).length;
             return (
@@ -295,7 +339,7 @@ export function StepInterests({
           })}
         </div>
         <p className="mt-2 text-xs text-subtle">
-          ถ้าไม่ติ๊กประเภทย่อย ระบบจะนับทั้งหมวด · ถ้าไม่เลือกหมวดเลย ระบบจะแนะนำหลากหลายแนว
+          เลือกอย่างน้อย 1 หมวด · ถ้าไม่ติ๊กประเภทย่อย ระบบจะนับสถานที่ทั้งหมวด
         </p>
       </StepGroup>
       <StepGroup title="การจัดแผน">
@@ -311,7 +355,7 @@ export function StepInterests({
 }
 
 export function interestsSummary(d: PlannerDraft, groups: PlaceGroupOption[]) {
-  if (d.interests.length === 0) return "ยังไม่เลือกแนว · ระบบจะแนะนำหลากหลาย";
+  if (d.interests.length === 0) return "ยังไม่เลือกแนวท่องเที่ยว";
   return groups
     .filter((g) => d.interests.includes(g.key))
     .map((g) => g.label.split(" · ")[0])

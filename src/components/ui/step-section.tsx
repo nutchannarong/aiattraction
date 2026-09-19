@@ -10,6 +10,8 @@ export function StepSection({
   title,
   summary,
   open,
+  disabled = false,
+  disabledReason,
   onToggle,
   children,
 }: {
@@ -17,6 +19,8 @@ export function StepSection({
   title: string;
   summary?: ReactNode;
   open: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   onToggle: () => void;
   children: ReactNode;
 }) {
@@ -32,8 +36,10 @@ export function StepSection({
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
+        disabled={disabled}
+        title={disabled ? disabledReason : undefined}
         onClick={onToggle}
-        className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-3 px-4 py-3.5 text-left"
+        className="grid w-full grid-cols-[36px_1fr_auto] items-center gap-3 px-4 py-3.5 text-left disabled:cursor-not-allowed disabled:opacity-55"
       >
         <span className="grid size-9 place-items-center rounded-full border-2 border-foreground bg-accent font-mono text-sm font-bold text-white dark:text-black">
           {n}
@@ -41,6 +47,11 @@ export function StepSection({
         <span>
           <h3 className="text-base font-bold">{title}</h3>
           {summary && <span className="mt-0.5 block text-xs leading-snug text-subtle">{summary}</span>}
+          {disabled && disabledReason && (
+            <span className="mt-0.5 block text-xs font-semibold leading-snug text-danger">
+              {disabledReason}
+            </span>
+          )}
         </span>
         <ChevronDown
           aria-hidden="true"

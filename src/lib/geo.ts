@@ -4,6 +4,55 @@
 export const NEARBY_RADIUS_M = 200000;
 
 export type Coordinates = { latitude: number; longitude: number };
+export type Waypoint = { lat: number; lng: number };
+
+/** Closest point and progress on an already-calculated road route. */
+export function snapWaypointToRoute(point: Waypoint, route: [number, number][]) {
+  if (route.length < 2) return { point, fraction: 0, distanceM: 0 };
+  const lengths: number[] = [];
+  let total = 0;
+  for (let i = 1; i < route.length; i++) {
+    const length = distanceMeters(
+      { latitude: route[i - 1][0], longitude: route[i - 1][1] },
+      { latitude: route[i][0], longitude: route[i][1] },
+    );
+    lengths.push(length);
+    total += length;
+  }
+  let best = { lat: route[0][0], lng: route[0][1] };
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestProgress = 0;
+  let travelled = 0;
+  for (let i = 0; i < route.length - 1; i++) {
+    const [ay, ax] = route[i];
+    const [by, bx] = route[i + 1];
+    const scaleLng = Math.cos((((ay + by) / 2) * Math.PI) / 180);
+    const dx = (bx - ax) * scaleLng;
+    const dy = by - ay;
+    const px = (point.lng - ax) * scaleLng;
+    const py = point.lat - ay;
+    const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy || 1)));
+    const candidate = { lat: ay + (by - ay) * t, lng: ax + (bx - ax) * t };
+    const distance = distanceMeters(
+      { latitude: point.lat, longitude: point.lng },
+      { latitude: candidate.lat, longitude: candidate.lng },
+    );
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+      bestProgress = total ? (travelled + lengths[i] * t) / total : 0;
+    }
+    travelled += lengths[i];
+  }
+  return { point: best, fraction: bestProgress, distanceM: bestDistance };
+}
+
+export function sortWaypointsAlongRoute<T extends Waypoint>(points: T[], route: [number, number][]) {
+  return points
+    .map((point) => ({ point, fraction: snapWaypointToRoute(point, route).fraction }))
+    .toSorted((a, b) => a.fraction - b.fraction)
+    .map(({ point }) => point);
+}
 
 /** Great-circle distance in meters. */
 export function distanceMeters(a: Coordinates, b: Coordinates) {

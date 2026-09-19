@@ -3,6 +3,7 @@
 import {
   CalendarCheck,
   ExternalLink,
+  ListOrdered,
   Loader2,
   Plus,
   RefreshCw,
@@ -21,11 +22,22 @@ import { Callout } from "@/components/ui/callout";
 import { Chip } from "@/components/ui/chip";
 import { SectionTitle } from "@/components/ui/section-title";
 import { StatTile } from "@/components/ui/stat-tile";
-import { formatDistance, formatDuration } from "@/lib/geo";
+import { Toggle } from "@/components/ui/toggle";
+import {
+  formatDistance,
+  formatDuration,
+  snapWaypointToRoute,
+  sortWaypointsAlongRoute,
+} from "@/lib/geo";
 import { FUEL_TYPES } from "@/lib/fuel";
 import { saveLocalTrip } from "@/lib/local-trips";
 import { poiKindLabel } from "@/lib/places";
-import { closestDay, COST_CATEGORY_FOR_KIND, costTotals } from "@/lib/planner/edit";
+import {
+  closestDay,
+  COST_CATEGORY_FOR_KIND,
+  costTotals,
+  orderTripItems,
+} from "@/lib/planner/edit";
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
 import type { Candidate, PlanItem, RoutePoi, TripPlan } from "@/lib/planner/plan-types";
 import { admissionFor, closedWarning, newItem } from "@/lib/planner/schedule";
@@ -166,6 +178,8 @@ export function PlanResult({
   const [addRequest, setAddRequest] = useState<AddRequest | null>(null);
   const [saving, startSaving] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [snapRoad, setSnapRoad] = useState(true);
+  const [snapMessage, setSnapMessage] = useState<string | null>(null);
 
   const groupColors = useMemo(
     () => Object.fromEntries(groups.map((g) => [g.key, g.color])),
@@ -192,6 +206,13 @@ export function PlanResult({
     onWaypointsChange(next);
   };
 
+  const preparePoint = (point: LatLng) => {
+    if (!snapRoad) return point;
+    const snapped = snapWaypointToRoute(point, plan.outbound.coordinates);
+    setSnapMessage(`เกาะเส้นทางแล้ว · ขยับ ${snapped.distanceM.toLocaleString("th-TH")} ม.`);
+    return snapped.point;
+  };
+
   /** Opens the add form on the day whose places are closest to this spot. */
   const requestAdd = (
     at: { latitude: number; longitude: number },
@@ -204,7 +225,8 @@ export function PlanResult({
 
   const save = () =>
     startSaving(async () => {
-      const res = await saveTrip(draft, plan);
+      const orderedPlan = orderTripItems(plan);
+      const res = await saveTrip(draft, orderedPlan);
       if ("needLogin" in res) {
         // The plan stays in this browser; signing in brings the user back here.
         router.push("/login?next=/plan");
@@ -212,7 +234,7 @@ export function PlanResult({
         setSaveError(res.error);
       } else {
         setSaveError(null);
-        saveLocalTrip({ id: res.id, savedAt: new Date().toISOString(), draft, plan });
+        saveLocalTrip({ id: res.id, savedAt: new Date().toISOString(), draft, plan: orderedPlan });
         onSaved(res.id);
         router.push("/trips");
       }
@@ -276,8 +298,11 @@ export function PlanResult({
               draft.routeStyle === "custom"
                 ? {
                     points,
-                    onAdd: (p) => setPoints([...points, p].slice(0, 15)),
-                    onMove: (i, p) => setPoints(points.map((q, k) => (k === i ? p : q))),
+                    onAdd: (p) => setPoints([...points, preparePoint(p)].slice(0, 15)),
+                    onMove: (i, p) => {
+                      const next = preparePoint(p);
+                      setPoints(points.map((q, k) => (k === i ? next : q)));
+                    },
                     onRemove: (i) => setPoints(points.filter((_, k) => k !== i)),
                   }
                 : null
@@ -324,6 +349,19 @@ export function PlanResult({
               <p className="text-xs text-muted">
                 แตะแผนที่เพื่อเพิ่มจุดผ่านตามลำดับ · ลากหมุดส้มเพื่อย้าย · แตะหมุดเพื่อลบ
               </p>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 p-2.5">
+                <div>
+                  <p className="text-xs font-bold">เกาะถนนอัตโนมัติ</p>
+                  <p className="text-[11px] text-subtle">ยึดกับเส้นถนนที่คำนวณอยู่ โดยไม่ส่งพิกัดออกเพิ่ม</p>
+                </div>
+                <Toggle
+                  label="เกาะถนนอัตโนมัติ"
+                  hideLabel
+                  checked={snapRoad}
+                  onChange={setSnapRoad}
+                />
+              </div>
+              {snapMessage && <p className="text-xs text-subtle">{snapMessage}</p>}
               <div className="flex flex-wrap gap-1.5">
                 <Button
                   variant="mini"
@@ -352,6 +390,13 @@ export function PlanResult({
                 </Button>
                 <Button variant="danger" disabled={!points.length} onClick={() => setPoints([])}>
                   <Trash2 className="size-3.5" aria-hidden="true" /> ล้าง ({points.length})
+                </Button>
+                <Button
+                  variant="mini"
+                  disabled={points.length < 2}
+                  onClick={() => setPoints(sortWaypointsAlongRoute(points, plan.outbound.coordinates))}
+                >
+                  <ListOrdered className="size-3.5" aria-hidden="true" /> เรียง waypoint
                 </Button>
               </div>
               <Button className="w-full" disabled={pending} onClick={() => onRecalculate(points)}>
