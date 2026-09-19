@@ -9,6 +9,9 @@ import { Planner } from "./planner";
 
 export const metadata: Metadata = { title: "วางแผนเที่ยว" };
 
+// Drafting compares several route styles in one server action; give it room.
+export const maxDuration = 60;
+
 function ageBucket(age: number): AdultAge | null {
   if (age >= 18 && age <= 22) return "18-22";
   if (age >= 23 && age <= 30) return "23-30";
@@ -17,7 +20,9 @@ function ageBucket(age: number): AdultAge | null {
   return null;
 }
 
-export default async function PlanPage() {
+export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
+  const params = await searchParams;
+  const entry = params.new === "1" ? "new" : params.resume === "1" ? "resume" : "ask";
   const [groups, fuelPrices, profile, provinces] = await Promise.all([
     getPlaceGroups(),
     getFuelPrices(),
@@ -65,6 +70,7 @@ export default async function PlanPage() {
         groups={groups}
         fuelPrices={fuelPrices}
         homeProvince={homeProvince}
+        entry={entry}
       />
     </div>
   );

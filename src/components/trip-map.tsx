@@ -40,6 +40,8 @@ type Props = {
     onRemove: (index: number) => void;
   } | null;
   onAddPoi?: (poi: RoutePoi) => void;
+  /** Other drafted route options, drawn faintly for comparison. */
+  altRoutes?: [number, number][][];
 };
 
 const iconCache = new Map<string, L.DivIcon>();
@@ -139,6 +141,7 @@ export default function TripMap({
   groupColors,
   editing,
   onAddPoi,
+  altRoutes = [],
 }: Props) {
   const fitPoints = useMemo(() => [...outbound, ...(inbound ?? [])], [outbound, inbound]);
   const visiblePois = useMemo(
@@ -153,6 +156,13 @@ export default function TripMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitToRoute points={fitPoints} />
+      {altRoutes.map((line, i) => (
+        <Polyline
+          key={`alt-${i}`}
+          positions={line}
+          pathOptions={{ color: "#6b7078", weight: 4, opacity: 0.55, dashArray: "2 8" }}
+        />
+      ))}
       {inbound && (
         <Polyline
           positions={inbound}

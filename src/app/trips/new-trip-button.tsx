@@ -2,10 +2,8 @@
 
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { clearPlannerStorage } from "@/app/plan/storage-keys";
 import { Button } from "@/components/ui/button";
-
-const DRAFT_KEY = "thainhaidee:planner-draft";
-const PLAN_KEY = "thainhaidee:planner-plan";
 
 export function NewTripButton() {
   const router = useRouter();
@@ -13,9 +11,8 @@ export function NewTripButton() {
   return (
     <Button
       onClick={() => {
-        localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem(PLAN_KEY);
-        router.push("/plan");
+        clearPlannerStorage();
+        router.push("/plan?new=1");
       }}
     >
       <Plus className="size-4" aria-hidden="true" /> วางแผนเที่ยวเพิ่ม

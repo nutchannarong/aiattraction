@@ -21,6 +21,7 @@ import type { NearbyPlace } from "@/lib/planner/nearby";
 import type { TripPlan } from "@/lib/planner/plan-types";
 import { lookupLinks } from "@/lib/planner/poi-categories";
 import type { PlaceGroupOption, PlannerDraft } from "@/lib/planner/types";
+import { ASSISTANT_CHAT_KEY } from "./storage-keys";
 
 type ChatMessage = {
   id: string;
@@ -32,13 +33,12 @@ type ChatMessage = {
   pending?: boolean;
 };
 
-const STORAGE_KEY = "thainhaidee:assistant-chat";
 const MAX_INPUT = 1000;
 
 function loadMessages(): ChatMessage[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(ASSISTANT_CHAT_KEY);
     const parsed = raw ? (JSON.parse(raw) as ChatMessage[]) : [];
     return Array.isArray(parsed) ? parsed.map((m) => ({ ...m, pending: false, status: null })) : [];
   } catch {
@@ -175,7 +175,7 @@ export function AssistantChat({
   useEffect(() => {
     try {
       const done = messages.filter((m) => !m.pending);
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(done.slice(-30)));
+      sessionStorage.setItem(ASSISTANT_CHAT_KEY, JSON.stringify(done.slice(-30)));
     } catch {
       // Storage blocked: the chat still works for this visit.
     }

@@ -3,8 +3,7 @@
 import { useEffect, useReducer, useRef } from "react";
 import { isoDate } from "@/lib/planner/draft";
 import type { PlannerDraft } from "@/lib/planner/types";
-
-const STORAGE_KEY = "thainhaidee:planner-draft";
+import { PLANNER_DRAFT_KEY } from "./storage-keys";
 
 type Action =
   { type: "patch"; patch: Partial<PlannerDraft> } | { type: "replace"; draft: PlannerDraft };
@@ -27,7 +26,7 @@ export function usePlannerDraft(initial: PlannerDraft) {
     if (restored.current) return;
     restored.current = true;
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(PLANNER_DRAFT_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved) as PlannerDraft;
       if (parsed?.version !== 1) return;
@@ -49,7 +48,7 @@ export function usePlannerDraft(initial: PlannerDraft) {
   useEffect(() => {
     if (!restored.current) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      localStorage.setItem(PLANNER_DRAFT_KEY, JSON.stringify(draft));
     } catch {
       // Storage full or blocked; the draft still works for this visit.
     }

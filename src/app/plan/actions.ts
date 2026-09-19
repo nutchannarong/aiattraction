@@ -5,7 +5,7 @@ import { toGeoJsonLine } from "@/lib/geo";
 import { getPlaceGroups } from "@/lib/place-groups";
 import { buildTripPlan, PlanError } from "@/lib/planner/build";
 import type { TripPlan } from "@/lib/planner/plan-types";
-import type { PlaceGroupOption, PlannerDraft } from "@/lib/planner/types";
+import type { PlaceGroupOption, PlannerDraft, RouteStyle } from "@/lib/planner/types";
 import { getSupabase } from "@/lib/supabase";
 
 const lat = z.number().min(4).max(22);
@@ -134,6 +134,53 @@ export async function findRoutePlaceGroups(input: {
     console.error("findRoutePlaceGroups failed:", error);
     return { error: "กรองแนวท่องเที่ยวตามพื้นที่ระหว่างทางไม่สำเร็จ กรุณาลองใหม่" };
   }
+}
+
+/** Styles to draft side by side: the user's choice first, then ones whose road actually differs. */
+function stylesToCompare(chosen: RouteStyle): RouteStyle[] {
+  if (chosen === "custom") return ["custom", "fastest"];
+  // "mixed" follows the same road as "fastest", so it only appears when chosen.
+  const extra = (["fastest", "scenic", "community"] as RouteStyle[]).filter((s) => s !== chosen);
+  return [chosen, ...extra].slice(0, 3);
+}
+
+export type DraftOptionsResult =
+  | {
+      options: { style: RouteStyle; plan: TripPlan }[];
+      failed: { style: RouteStyle; error: string }[];
+    }
+  | { error: string };
+
+/** Drafts 2–3 route styles so the user can compare them; one failing doesn't sink the rest. */
+export async function draftTripOptions(input: PlannerDraft): Promise<DraftOptionsResult> {
+  const parsed = draftSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ครบหรือไม่ถูกต้อง" };
+  }
+  const styles = stylesToCompare(input.routeStyle);
+  // Stagger the starts: the free Valhalla server asks for about one request a second.
+  const settled = await Promise.allSettled(
+    styles.map(async (style, i) => {
+      if (i) await new Promise((r) => setTimeout(r, 400 * i));
+      return buildTripPlan({ ...input, routeStyle: style });
+    }),
+  );
+  const options: { style: RouteStyle; plan: TripPlan }[] = [];
+  const failed: { style: RouteStyle; error: string }[] = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      options.push({ style: styles[i], plan: r.value });
+    } else {
+      if (!(r.reason instanceof PlanError)) console.error(r.reason);
+      failed.push({
+        style: styles[i],
+        error: r.reason instanceof PlanError ? r.reason.message : "ร่างแผนแบบนี้ไม่สำเร็จ",
+      });
+    }
+  });
+  if (!options.length)
+    return { error: failed[0]?.error ?? "ร่างแผนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+  return { options, failed };
 }
 
 export async function draftTripPlan(input: PlannerDraft): Promise<DraftPlanResult> {

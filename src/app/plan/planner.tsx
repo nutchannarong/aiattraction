@@ -1,14 +1,16 @@
 "use client";
 
-import { RotateCcw, Sparkles } from "lucide-react";
-import { useState, useTransition } from "react";
+import { History, RotateCcw, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { Modal } from "@/components/ui/modal";
 import { StepSection } from "@/components/ui/step-section";
 import type { FuelPrice } from "@/lib/fuel";
 import { addMinutes, closestDay, firstGap, itemFromNearby } from "@/lib/planner/edit";
 import type { NearbyPlace } from "@/lib/planner/nearby";
-import type { PlaceGroupOption, PlaceRef, PlannerDraft } from "@/lib/planner/types";
+import type { PlaceGroupOption, PlaceRef, PlannerDraft, RouteStyle } from "@/lib/planner/types";
 import {
   interestsSummary,
   daysBetween,
@@ -22,18 +24,22 @@ import {
   whereSummary,
   whoSummary,
 } from "./steps";
-import { draftTripPlan } from "./actions";
+import { draftTripOptions, draftTripPlan } from "./actions";
 import { AssistantChat } from "./assistant-chat";
 import type { AddRequest } from "./day-editor";
 import { PlanLoading, PlanResult } from "./plan-result";
 import { usePlannerDraft } from "./use-planner-draft";
 import { useSavedPlan } from "./use-saved-plan";
+import { clearPlannerStorage } from "./storage-keys";
+import { useStoredTripSummary } from "./use-stored-trip-summary";
 
 export type PlannerProps = {
   initialDraft: PlannerDraft;
   groups: PlaceGroupOption[];
   fuelPrices: FuelPrice[];
   homeProvince: PlaceRef | null;
+  /** "ask": offer to continue a half-made plan · "resume": back from sign-in · "new": start clean. */
+  entry: "ask" | "resume" | "new";
 };
 
 /** What blocks an individual planner step, in Thai, or null when complete. */
@@ -67,10 +73,19 @@ export function missingForPlan(d: PlannerDraft): string | null {
   return null;
 }
 
-export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: PlannerProps) {
+export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry }: PlannerProps) {
+  const router = useRouter();
+  // "?new=1": forget what's stored before the hooks below restore it (idempotent, client only).
+  useState(() => {
+    if (entry === "new" && typeof window !== "undefined") clearPlannerStorage();
+    return null;
+  });
+  const storedSummary = useStoredTripSummary();
+  const [askResume, setAskResume] = useState(entry === "ask");
+  const [chatKey, setChatKey] = useState(0);
   const { draft, patch, reset } = usePlannerDraft(initialDraft);
   const [open, setOpen] = useState<number | null>(1);
-  const { saved, start, editPlan, markSaved, clear } = useSavedPlan();
+  const { saved, startOptions, choose, replaceOption, editPlan, markSaved, clear } = useSavedPlan();
   const [requested, setRequested] = useState<PlannerDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -88,7 +103,29 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
   };
   const stepErrors = [1, 2, 3, 4, 5].map((step) => missingForStep(draft, step));
 
+  // Keep the address bar at /plan once the entry flag has done its job.
+  useEffect(() => {
+    if (entry !== "ask") router.replace("/plan", { scroll: false });
+  }, [entry, router]);
+
+  /** Drafts the chosen route style plus alternatives to compare. */
   const compute = (d: PlannerDraft) => {
+    setRequested(d);
+    startTransition(async () => {
+      const res = await draftTripOptions(d);
+      if ("error" in res) {
+        setError(res.error);
+      } else {
+        setError(null);
+        startOptions(d, res.options, res.failed);
+      }
+    });
+  };
+
+  /** Re-drafts only the custom route after the user moved its points. */
+  const recalculate = (customWaypoints: PlannerDraft["customWaypoints"]) => {
+    if (!saved) return;
+    const d = { ...saved.draft, customWaypoints };
     setRequested(d);
     startTransition(async () => {
       const res = await draftTripPlan(d);
@@ -96,9 +133,26 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
         setError(res.error);
       } else {
         setError(null);
-        start(d, res.plan);
+        replaceOption({ style: d.routeStyle, plan: res.plan });
       }
     });
+  };
+
+  const chooseOption = (style: RouteStyle) => {
+    choose(style);
+    patch({ routeStyle: style });
+  };
+
+  /** Clears answers, drafted plans and the assistant chat. */
+  const startFresh = () => {
+    clearPlannerStorage();
+    reset();
+    clear();
+    setChatKey((k) => k + 1);
+    setAddRequest(null);
+    setRequested(null);
+    setError(null);
+    setOpen(1);
   };
 
   const steps = [
@@ -184,13 +238,7 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
           <Button
             variant="ghost"
             onClick={() => {
-              if (window.confirm("ล้างคำตอบและแผนที่ร่างไว้ทั้งหมดแล้วเริ่มใหม่?")) {
-                reset();
-                clear();
-                setRequested(null);
-                setError(null);
-                setOpen(1);
-              }
+              if (window.confirm("ล้างคำตอบและแผนที่ร่างไว้ทั้งหมดแล้วเริ่มใหม่?")) startFresh();
             }}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
@@ -228,12 +276,15 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
             error={error}
             waypoints={draft.customWaypoints}
             onWaypointsChange={(customWaypoints) => patch({ customWaypoints })}
-            onRecalculate={(customWaypoints) => compute({ ...saved.draft, customWaypoints })}
+            onRecalculate={recalculate}
             onPlanChange={editPlan}
             tripId={saved.tripId}
             onSaved={markSaved}
             addRequest={addRequest}
             onAddRequest={setAddRequest}
+            options={saved.options ?? []}
+            failed={saved.failed ?? []}
+            onChoose={chooseOption}
           />
         ) : (
           requested && <PlanLoading error={error} onRetry={() => compute(requested)} />
@@ -241,11 +292,43 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
       </div>
 
       <AssistantChat
+        key={chatKey}
         draft={draft}
         plan={saved?.plan ?? null}
         groups={groups}
         onAddPlace={saved ? addFromAssistant : null}
       />
+
+      <Modal
+        open={askResume && storedSummary != null}
+        onClose={() => setAskResume(false)}
+        title="มีแผนที่ทำค้างไว้"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                startFresh();
+                setAskResume(false);
+              }}
+            >
+              <RotateCcw className="size-4" aria-hidden="true" /> เริ่มแผนใหม่
+            </Button>
+            <Button onClick={() => setAskResume(false)}>
+              <History className="size-4" aria-hidden="true" /> ทำแผนเดิมต่อ
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">ครั้งก่อนคุณวางแผนค้างไว้ในเครื่องนี้:</p>
+        <p className="mt-2 rounded-xl border-2 border-foreground bg-surface-3 px-3 py-2.5 font-semibold">
+          {storedSummary}
+        </p>
+        <p className="mt-3 text-xs text-subtle">
+          เริ่มแผนใหม่จะล้างคำตอบ แผนที่ร่างไว้ และแชทผู้ช่วย
+          ส่วนทริปที่บันทึกไว้ในแผนของฉันจะไม่หาย
+        </p>
+      </Modal>
     </div>
   );
 }

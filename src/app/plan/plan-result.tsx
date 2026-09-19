@@ -42,12 +42,14 @@ import {
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
 import type { Candidate, PlanItem, RoutePoi, TripPlan } from "@/lib/planner/plan-types";
 import { admissionFor, closedWarning, newItem } from "@/lib/planner/schedule";
-import type { LatLng, PlaceGroupOption, PlannerDraft } from "@/lib/planner/types";
+import type { LatLng, PlaceGroupOption, PlannerDraft, RouteStyle } from "@/lib/planner/types";
 import { BookingChecklist } from "./booking-checklist";
 import { CostSummary } from "./cost-summary";
 import { baht } from "./day-plan";
 import { DayEditor, type AddRequest } from "./day-editor";
 import { saveTrip } from "./editor-actions";
+import { PlanOptions } from "./plan-options";
+import type { FailedOption, PlanOption } from "./use-saved-plan";
 
 const TripMap = dynamic(() => import("@/components/trip-map"), {
   ssr: false,
@@ -134,7 +136,7 @@ export function PlanLoading({ error, onRetry }: { error: string | null; onRetry:
       ) : (
         <p className="flex items-center gap-2 text-sm text-muted">
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-          กำลังคำนวณเส้นทาง เลือกจุดแวะ และจัดตารางรายวัน…
+          กำลังร่างหลายแบบเส้นทางให้เทียบ: คำนวณเส้นทาง เลือกจุดแวะ และจัดตารางรายวัน…
         </p>
       )}
     </div>
@@ -155,6 +157,9 @@ export function PlanResult({
   onSaved,
   addRequest,
   onAddRequest,
+  options = [],
+  failed = [],
+  onChoose,
 }: {
   /** The answers the plan was drafted from. */
   draft: PlannerDraft;
@@ -172,6 +177,10 @@ export function PlanResult({
   /** Pending "add to daily plan" (from the map, suggestions or the AI assistant). */
   addRequest: AddRequest | null;
   onAddRequest: (request: AddRequest | null) => void;
+  /** Other route styles drafted in the same run, for comparison. */
+  options?: PlanOption[];
+  failed?: FailedOption[];
+  onChoose?: (style: RouteStyle) => void;
 }) {
   const router = useRouter();
   const [visible, setVisible] = useState<string[]>(() =>
@@ -235,7 +244,7 @@ export function PlanResult({
       const res = await saveTrip(draft, orderedPlan);
       if ("needLogin" in res) {
         // The plan stays in this browser; signing in brings the user back here.
-        router.push("/login?next=/plan");
+        router.push(`/login?next=${encodeURIComponent("/plan?resume=1")}`);
       } else if ("error" in res) {
         setSaveError(res.error);
       } else {
@@ -255,6 +264,16 @@ export function PlanResult({
       <SectionTitle note="คำนวณจากรถ เวลาออกเดินทาง และพิกัดจริงของทุกจุด">
         ร่างแผนการเดินทาง
       </SectionTitle>
+
+      {onChoose && options.length + failed.length > 1 && (
+        <PlanOptions
+          options={options}
+          failed={failed}
+          chosen={draft.routeStyle}
+          currentPlan={plan}
+          onChoose={onChoose}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile
@@ -300,6 +319,9 @@ export function PlanResult({
             visibleCategories={visible}
             groupColors={groupColors}
             onAddPoi={(p) => requestAdd(p, (date) => itemFromPoi(p, date))}
+            altRoutes={options
+              .filter((o) => o.style !== draft.routeStyle)
+              .map((o) => o.plan.outbound.coordinates)}
             editing={
               draft.routeStyle === "custom"
                 ? {
