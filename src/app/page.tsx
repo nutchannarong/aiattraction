@@ -1,12 +1,9 @@
 import { Car, MapPinned, Route, Wallet } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { buttonClass } from "@/components/ui/button";
 import { StickerCard } from "@/components/ui/sticker-card";
 import { countAttractions } from "@/lib/attractions";
-
-const SEARCH_PARAMS = ["q", "category", "type", "province", "page"];
 
 const STEPS = [
   { icon: MapPinned, title: "จะไปไหน เมื่อไร", body: "เลือกจังหวัด ปักหมุด หรือค้นหาสถานที่ พร้อมป้ายเมืองหลัก/เมืองรอง" },
@@ -15,16 +12,7 @@ const STEPS = [
   { icon: Wallet, title: "แผนรายวันและค่าใช้จ่าย", body: "จัดกิจกรรมทีละวัน เลือกที่พัก จองผ่านช่องทางที่ถูกที่สุด แล้วสรุปงบ" },
 ];
 
-export default async function Home({ searchParams }: PageProps<"/">) {
-  // Old search URLs (/?q=…) moved to /attractions.
-  const params = await searchParams;
-  const legacy = new URLSearchParams();
-  for (const key of SEARCH_PARAMS) {
-    const v = params[key];
-    if (typeof v === "string" && v) legacy.set(key, v);
-  }
-  if (legacy.size > 0) redirect(`/attractions?${legacy}`);
-
+export default async function Home() {
   const total = await countAttractions();
 
   return (

@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { destinationAfterSignIn } from "@/lib/auth-redirect";
 import { createAuthClient, isAuthProviderEnabled } from "@/lib/supabase-server";
 
 /** Only allow same-site relative paths to avoid open redirects. */
@@ -52,7 +53,7 @@ export async function signIn(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(loginUrl({ error: describeError(error), email, next }));
 
-  redirect(next);
+  redirect(await destinationAfterSignIn(next));
 }
 
 export async function signUp(formData: FormData) {
@@ -77,23 +78,35 @@ export async function signUp(formData: FormData) {
   redirect(next);
 }
 
-export async function signInWithGoogle(formData: FormData) {
+const PROVIDER_LABEL = { google: "Google", facebook: "Facebook" } as const;
+type OAuthProvider = keyof typeof PROVIDER_LABEL;
+
+async function signInWithOAuthProvider(provider: OAuthProvider, formData: FormData) {
   const next = safeNext(formData.get("next"));
+  const label = PROVIDER_LABEL[provider];
   // signInWithOAuth only builds a URL; check first so users get a clear message
   // instead of a raw JSON error page from Supabase.
-  if (!(await isAuthProviderEnabled("google"))) {
-    redirect(loginUrl({ error: "ยังไม่ได้เปิดการเข้าสู่ระบบด้วย Google กรุณาใช้อีเมลแทน", next }));
+  if (!(await isAuthProviderEnabled(provider))) {
+    redirect(loginUrl({ error: `ยังไม่ได้เปิดการเข้าสู่ระบบด้วย ${label} กรุณาใช้วิธีอื่น`, next }));
   }
 
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider,
     options: { redirectTo: callbackUrl(await getOrigin(), next) },
   });
   if (error || !data.url) {
-    redirect(loginUrl({ error: error ? describeError(error) : "เข้าสู่ระบบด้วย Google ไม่สำเร็จ", next }));
+    redirect(loginUrl({ error: error ? describeError(error) : `เข้าสู่ระบบด้วย ${label} ไม่สำเร็จ`, next }));
   }
   redirect(data.url);
+}
+
+export async function signInWithGoogle(formData: FormData) {
+  await signInWithOAuthProvider("google", formData);
+}
+
+export async function signInWithFacebook(formData: FormData) {
+  await signInWithOAuthProvider("facebook", formData);
 }
 
 export async function signOut() {

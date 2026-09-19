@@ -15,6 +15,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(callback);
   }
 
+  // The search page moved from / to /attractions; keep old shared links working.
+  if (pathname === "/" && ["q", "category", "type", "province", "page"].some((k) => searchParams.has(k))) {
+    const moved = request.nextUrl.clone();
+    moved.pathname = "/attractions";
+    return NextResponse.redirect(moved, 308);
+  }
+
   let response = NextResponse.next({ request });
   const { url, key } = readEnv();
   if (!url || !key) return response;

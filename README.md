@@ -185,4 +185,13 @@ select public.import_poi('car', 'https://overpass-api.de/api/interpreter');
      - Authorized redirect URIs: `https://mdbnwbrugxrzigevudob.supabase.co/auth/v1/callback`
 3. **Supabase → Authentication → Sign In / Providers → Google** เปิดใช้งาน แล้วใส่ Client ID และ Client Secret จากข้อ 2
 
-ถ้ายังไม่เปิด Google provider ปุ่ม "เข้าสู่ระบบด้วย Google" จะแจ้งให้ใช้อีเมลแทน
+4. **Facebook (Meta for Developers → https://developers.facebook.com/apps)**
+   - Create App → เลือก use case "Authenticate and request data from users with Facebook Login"
+   - Facebook Login → Settings → Valid OAuth Redirect URIs: `https://mdbnwbrugxrzigevudob.supabase.co/auth/v1/callback`
+   - App settings → Basic: ใส่ App Domains `thainhaidee.vercel.app`, Privacy Policy URL แล้วสลับแอปเป็น **Live**
+   - Permissions ที่ใช้: `email`, `public_profile`
+   - **Supabase → Authentication → Sign In / Providers → Facebook** เปิดใช้งาน แล้วใส่ App ID และ App Secret
+
+ถ้ายังไม่เปิด provider ไหน ปุ่มของ provider นั้นจะแจ้งให้ใช้วิธีอื่นแทน
+
+หลังเข้าสู่ระบบครั้งแรก ระบบสร้างแถวใน `profiles` ให้อัตโนมัติ (เติมชื่อและรูปจาก Google/Facebook) แล้วพาไปหน้า `/profile` ให้กรอก วันเกิด เพศ จังหวัดบ้านเกิด (บอกเมืองหลัก/เมืองรอง) และอาชีพ
