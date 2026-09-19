@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
 import {
   CATEGORIES,
   getFilterOptions,
@@ -57,6 +58,33 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const field =
     "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent";
 
+  const categoryOptions: SearchableOption[] = Object.entries(CATEGORIES).map(([id, label]) => ({
+    value: id,
+    label,
+  }));
+  const typeOptions: SearchableOption[] = Array.from(
+    types.reduce((byType, type) => {
+      const current = byType.get(type.att_type);
+      byType.set(type.att_type, {
+        value: String(type.att_type),
+        label: type.att_type_label,
+        total: (current?.total ?? 0) + type.total,
+      });
+      return byType;
+    }, new Map<number, SearchableOption & { total: number }>()),
+  ).map(([, type]) => ({
+    value: type.value,
+    label: `${type.label} (${type.total})`,
+  }));
+  const provinceOptions: SearchableOption[] = Object.entries(provincesByRegion).flatMap(
+    ([region, provinces]) =>
+      provinces.map((p) => ({
+        value: p.att_province_id,
+        label: `${p.province_name_th} (${p.total})`,
+        group: region,
+      })),
+  );
+
   return (
     <div className="space-y-6">
       <form className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
@@ -66,34 +94,24 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           placeholder="ค้นหาชื่อสถานที่ จังหวัด อำเภอ"
           className={field}
         />
-        <select name="category" defaultValue={filters.category ?? ""} className={field}>
-          <option value="">ทุกหมวดหมู่</option>
-          {Object.entries(CATEGORIES).map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select name="type" defaultValue={filters.type ?? ""} className={field}>
-          <option value="">ทุกประเภท</option>
-          {types.map((t) => (
-            <option key={`${t.att_category}-${t.att_type}`} value={t.att_type}>
-              {t.att_type_label} ({t.total})
-            </option>
-          ))}
-        </select>
-        <select name="province" defaultValue={filters.province ?? ""} className={field}>
-          <option value="">ทุกจังหวัด</option>
-          {Object.entries(provincesByRegion).map(([region, provinces]) => (
-            <optgroup key={region} label={region}>
-              {provinces.map((p) => (
-                <option key={p.att_province_id} value={p.att_province_id}>
-                  {p.province_name_th} ({p.total})
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <SearchableSelect
+          name="category"
+          placeholder="ทุกหมวดหมู่"
+          options={categoryOptions}
+          value={filters.category ? String(filters.category) : ""}
+        />
+        <SearchableSelect
+          name="type"
+          placeholder="ทุกประเภท"
+          options={typeOptions}
+          value={filters.type ? String(filters.type) : ""}
+        />
+        <SearchableSelect
+          name="province"
+          placeholder="ทุกจังหวัด"
+          options={provinceOptions}
+          value={filters.province ?? ""}
+        />
         <button className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white dark:text-black">
           ค้นหา
         </button>
