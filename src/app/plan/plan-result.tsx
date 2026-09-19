@@ -23,6 +23,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { StatTile } from "@/components/ui/stat-tile";
 import { formatDistance, formatDuration } from "@/lib/geo";
 import { FUEL_TYPES } from "@/lib/fuel";
+import { saveLocalTrip } from "@/lib/local-trips";
 import { poiKindLabel } from "@/lib/places";
 import { closestDay, COST_CATEGORY_FOR_KIND, costTotals } from "@/lib/planner/edit";
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
@@ -211,7 +212,9 @@ export function PlanResult({
         setSaveError(res.error);
       } else {
         setSaveError(null);
+        saveLocalTrip({ id: res.id, savedAt: new Date().toISOString(), draft, plan });
         onSaved(res.id);
+        router.push("/trips");
       }
     });
 

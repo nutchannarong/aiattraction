@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createAuthClient, getCurrentUser } from "./supabase-server";
+import { MOCK_PROFILE, MOCK_USER_ID } from "./mock-auth";
 
 export type Gender = "male" | "female" | "other" | "unspecified";
 
@@ -24,6 +25,8 @@ export const GENDER_LABEL: Record<Gender, string> = {
 export const getMyProfile = cache(async (): Promise<Profile | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
+  if (user.id === MOCK_USER_ID) return MOCK_PROFILE;
+
   const supabase = await createAuthClient();
   const { data, error } = await supabase
     .from("profiles")

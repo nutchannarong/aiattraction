@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import { LOCAL_TRIPS_CHANGED, readLocalTrips } from "@/lib/local-trips";
 
 const LINKS = [
   { href: "/", label: "วางแผน", match: (p: string) => p === "/" || p.startsWith("/plan") },
@@ -14,6 +16,20 @@ const LINKS = [
 
 export function NavLinks() {
   const pathname = usePathname();
+  const [tripCount, setTripCount] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setTripCount(readLocalTrips().length);
+    const timer = window.setTimeout(refresh, 0);
+    window.addEventListener(LOCAL_TRIPS_CHANGED, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(LOCAL_TRIPS_CHANGED, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
   return (
     <nav
       aria-label="เมนูหลัก"
@@ -32,6 +48,7 @@ export function NavLinks() {
             )}
           >
             {l.label}
+            {l.href === "/trips" && tripCount > 0 ? ` (${tripCount})` : ""}
           </Link>
         );
       })}

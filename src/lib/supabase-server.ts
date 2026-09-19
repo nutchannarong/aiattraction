@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { readEnv } from "./supabase";
+import { getMockUser } from "./mock-auth";
 
 /**
  * Per-request Supabase client bound to the auth cookies, for reading the
@@ -29,6 +30,9 @@ export async function createAuthClient() {
 export type CurrentUser = { id: string; email: string | null };
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const mockUser = await getMockUser();
+  if (mockUser) return mockUser;
+
   const supabase = await createAuthClient();
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims;

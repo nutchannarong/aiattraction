@@ -1,8 +1,11 @@
 import { isProfileComplete, type Profile } from "./profile";
 import { createAuthClient } from "./supabase-server";
+import { getMockUser } from "./mock-auth";
 
 /** Where to send a user who just signed in: complete the profile first if needed. */
 export async function destinationAfterSignIn(next: string): Promise<string> {
+  if (await getMockUser()) return next;
+
   const supabase = await createAuthClient();
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims?.sub;

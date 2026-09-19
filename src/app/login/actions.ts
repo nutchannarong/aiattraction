@@ -4,6 +4,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { destinationAfterSignIn } from "@/lib/auth-redirect";
 import { createAuthClient, isAuthProviderEnabled } from "@/lib/supabase-server";
+import {
+  clearMockUser,
+  getMockUser,
+  MOCK_EMAIL,
+  MOCK_PASSWORD,
+  setMockUser,
+} from "@/lib/mock-auth";
 
 /** Only allow same-site relative paths to avoid open redirects. */
 function safeNext(value: FormDataEntryValue | null) {
@@ -110,7 +117,24 @@ export async function signInWithFacebook(formData: FormData) {
 }
 
 export async function signOut() {
+  const mockUser = await getMockUser();
+  await clearMockUser();
+  if (mockUser) redirect("/");
+
   const supabase = await createAuthClient();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+export async function signInAsDemo(formData: FormData) {
+  const next = safeNext(formData.get("next"));
+  if (
+    process.env.NODE_ENV !== "development" ||
+    formData.get("email") !== MOCK_EMAIL ||
+    formData.get("password") !== MOCK_PASSWORD
+  ) {
+    redirect(loginUrl({ error: "อีเมลหรือรหัสผ่านบัญชีทดลองไม่ถูกต้อง", next }));
+  }
+  await setMockUser();
+  redirect(next);
 }

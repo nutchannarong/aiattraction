@@ -6,8 +6,9 @@ import { GoogleIcon } from "@/components/google-icon";
 import { buttonClass } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { StickerCard } from "@/components/ui/sticker-card";
+import { MOCK_EMAIL, MOCK_PASSWORD } from "@/lib/mock-auth";
 import { getCurrentUser } from "@/lib/supabase-server";
-import { signIn, signInWithFacebook, signInWithGoogle, signUp } from "./actions";
+import { signIn, signInAsDemo, signInWithFacebook, signInWithGoogle, signUp } from "./actions";
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
@@ -43,6 +44,30 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       {message && <Callout tone="success">{message}</Callout>}
 
       <StickerCard tape className="space-y-3 p-5">
+        {process.env.NODE_ENV === "development" && (
+          <div className="space-y-2 rounded-[10px] border border-border bg-surface-2 p-3">
+            <p className="text-xs font-bold text-subtle">บัญชีทดลองสำหรับ local</p>
+            <form action={signInAsDemo} className="space-y-2">
+              <input type="hidden" name="next" value={next} />
+              <input
+                name="email"
+                type="email"
+                defaultValue={MOCK_EMAIL}
+                className={field}
+                aria-label="อีเมลบัญชีทดลอง"
+              />
+              <input
+                name="password"
+                type="password"
+                defaultValue={MOCK_PASSWORD}
+                className={field}
+                aria-label="รหัสผ่านบัญชีทดลอง"
+              />
+              <button className={buttonClass("cta", "w-full justify-center")}>เข้าสู่ระบบบัญชีทดลอง</button>
+            </form>
+            <p className="text-center text-xs text-subtle">อีเมล: {MOCK_EMAIL} · รหัสผ่าน: {MOCK_PASSWORD}</p>
+          </div>
+        )}
         <p className="text-xs font-bold text-subtle">เลือกวิธีเข้าสู่ระบบ</p>
         {/* <form action={signInWithFacebook}>
           <input type="hidden" name="next" value={next} />

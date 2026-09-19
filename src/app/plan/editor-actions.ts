@@ -6,6 +6,7 @@ import { poiKindLabel } from "@/lib/places";
 import { nearbyCategory, type NearbyPlace } from "@/lib/planner/nearby";
 import type { TripPlan } from "@/lib/planner/plan-types";
 import type { PlannerDraft } from "@/lib/planner/types";
+import { getMockUser } from "@/lib/mock-auth";
 import { getSupabase } from "@/lib/supabase";
 import { createAuthClient } from "@/lib/supabase-server";
 
@@ -257,6 +258,11 @@ export async function saveTrip(draft: PlannerDraft, plan: TripPlan): Promise<Sav
   if (!parsed.success || !draft.origin || !draft.destination) {
     return { error: "ข้อมูลแผนไม่ครบหรือไม่ถูกต้อง ลองร่างแผนใหม่อีกครั้ง" };
   }
+
+  // The local demo account has no Supabase auth session. The edited plan is
+  // already kept in localStorage by useSavedPlan, so mark it saved locally.
+  if (await getMockUser()) return { id: `mock-${crypto.randomUUID()}` };
+
   const supabase = await createAuthClient();
   const { data: auth } = await supabase.auth.getClaims();
   if (!auth?.claims) return { needLogin: true };
