@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { StepSection } from "@/components/ui/step-section";
 import type { FuelPrice } from "@/lib/fuel";
@@ -18,8 +18,10 @@ import {
   whereSummary,
   whoSummary,
 } from "./steps";
-import { PlanResult } from "./plan-result";
+import { draftTripPlan } from "./actions";
+import { PlanLoading, PlanResult } from "./plan-result";
 import { usePlannerDraft } from "./use-planner-draft";
+import { useSavedPlan } from "./use-saved-plan";
 
 export type PlannerProps = {
   initialDraft: PlannerDraft;
@@ -41,8 +43,24 @@ export function missingForPlan(d: PlannerDraft): string | null {
 export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: PlannerProps) {
   const { draft, patch, reset } = usePlannerDraft(initialDraft);
   const [open, setOpen] = useState<number | null>(1);
-  const [submitted, setSubmitted] = useState<PlannerDraft | null>(null);
+  const { saved, start, editPlan, markSaved, clear } = useSavedPlan();
+  const [requested, setRequested] = useState<PlannerDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
   const missing = missingForPlan(draft);
+
+  const compute = (d: PlannerDraft) => {
+    setRequested(d);
+    startTransition(async () => {
+      const res = await draftTripPlan(d);
+      if ("error" in res) {
+        setError(res.error);
+      } else {
+        setError(null);
+        start(d, res.plan);
+      }
+    });
+  };
 
   const steps = [
     {
@@ -104,9 +122,11 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
           <Button
             variant="ghost"
             onClick={() => {
-              if (window.confirm("ล้างคำตอบทั้งหมดแล้วเริ่มใหม่?")) {
+              if (window.confirm("ล้างคำตอบและแผนที่ร่างไว้ทั้งหมดแล้วเริ่มใหม่?")) {
                 reset();
-                setSubmitted(null);
+                clear();
+                setRequested(null);
+                setError(null);
                 setOpen(1);
               }
             }}
@@ -115,9 +135,15 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
             เริ่มใหม่
           </Button>
           <Button
-            disabled={Boolean(missing)}
+            disabled={Boolean(missing) || pending}
             onClick={() => {
-              setSubmitted(draft);
+              if (
+                saved?.edited &&
+                !window.confirm("แผนรายวันที่แก้ไว้จะถูกแทนด้วยแผนที่ร่างใหม่ ต้องการร่างใหม่ไหม?")
+              ) {
+                return;
+              }
+              compute(draft);
               setOpen(null);
               requestAnimationFrame(() =>
                 document.getElementById("plan-result")?.scrollIntoView({ behavior: "smooth" }),
@@ -131,13 +157,22 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
       </div>
 
       <div id="plan-result" className="scroll-mt-24">
-        {submitted && (
+        {saved ? (
           <PlanResult
-            draft={submitted}
+            draft={saved.draft}
+            plan={saved.plan}
             groups={groups}
+            pending={pending}
+            error={error}
             waypoints={draft.customWaypoints}
             onWaypointsChange={(customWaypoints) => patch({ customWaypoints })}
+            onRecalculate={(customWaypoints) => compute({ ...saved.draft, customWaypoints })}
+            onPlanChange={editPlan}
+            tripId={saved.tripId}
+            onSaved={markSaved}
           />
+        ) : (
+          requested && <PlanLoading error={error} onRetry={() => compute(requested)} />
         )}
       </div>
     </div>

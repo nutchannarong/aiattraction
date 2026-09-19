@@ -1,8 +1,19 @@
 "use client";
 
-import { ExternalLink, Loader2, RefreshCw, Redo2, Trash2, Undo2 } from "lucide-react";
+import {
+  CalendarCheck,
+  ExternalLink,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Redo2,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import { CategoryArt } from "@/components/category-art";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +23,17 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { StatTile } from "@/components/ui/stat-tile";
 import { formatDistance, formatDuration } from "@/lib/geo";
 import { FUEL_TYPES } from "@/lib/fuel";
+import { poiKindLabel } from "@/lib/places";
+import { closestDay, COST_CATEGORY_FOR_KIND, costTotals } from "@/lib/planner/edit";
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
-import type { TripPlan } from "@/lib/planner/plan-types";
+import type { Candidate, PlanItem, RoutePoi, TripPlan } from "@/lib/planner/plan-types";
+import { admissionFor, closedWarning, newItem } from "@/lib/planner/schedule";
 import type { LatLng, PlaceGroupOption, PlannerDraft } from "@/lib/planner/types";
-import { draftTripPlan } from "./actions";
-import { baht, DayPlanList } from "./day-plan";
+import { BookingChecklist } from "./booking-checklist";
+import { CostSummary } from "./cost-summary";
+import { baht } from "./day-plan";
+import { DayEditor, type AddRequest } from "./day-editor";
+import { saveTrip } from "./editor-actions";
 
 const TripMap = dynamic(() => import("@/components/trip-map"), {
   ssr: false,
@@ -40,22 +57,103 @@ function googleMapsUrl(draft: PlannerDraft, plan: TripPlan) {
   return `https://www.google.com/maps/dir/?api=1&origin=${o.latitude},${o.longitude}&destination=${d.latitude},${d.longitude}&travelmode=${mode}${via ? `&waypoints=${encodeURIComponent(via)}` : ""}`;
 }
 
+function itemFromPoi(p: RoutePoi, date: string): PlanItem {
+  const category = COST_CATEGORY_FOR_KIND[p.kind] ?? null;
+  return newItem({
+    kind: category === "lodging" ? "lodging" : category === "food" ? "meal" : "poi",
+    activity: `แวะ${poiKindLabel(p.kind)}`,
+    place: {
+      source: "poi",
+      id: p.id,
+      name: p.name ?? p.brand ?? poiKindLabel(p.kind),
+      area: p.address,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      category: p.kind,
+    },
+    phone: p.phone,
+    openingHours: p.openingHours,
+    warning: closedWarning(p.openingHours, date),
+    costCategory: category,
+  });
+}
+
+function itemFromCandidate(c: Candidate, date: string, draft: PlannerDraft): PlanItem {
+  const fee = admissionFor(c, draft);
+  return newItem({
+    kind: "attraction",
+    activity: `เที่ยว ${c.typeLabel ?? "แหล่งท่องเที่ยว"}`,
+    place: {
+      source: "attraction",
+      id: c.attId,
+      name: c.name,
+      area: [c.district, c.province].filter(Boolean).join(" · ") || null,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      category: c.groupKey,
+      isSecondaryCity: c.isSecondaryCity,
+    },
+    phone: c.phone,
+    openingHours: c.openingHours,
+    warning: closedWarning(c.openingHours, date),
+    costEstimate: fee || null,
+    costCategory: fee ? "admission" : null,
+  });
+}
+
+export function PlanLoading({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  return (
+    <div
+      className="rounded-card border-2 border-foreground bg-surface p-6 shadow-hard"
+      aria-live="polite"
+    >
+      {error ? (
+        <Callout tone="danger" title="ร่างแผนไม่สำเร็จ">
+          {error}
+          <div className="mt-2">
+            <Button variant="mini" onClick={onRetry}>
+              <RefreshCw className="size-3.5" aria-hidden="true" /> ลองใหม่
+            </Button>
+          </div>
+        </Callout>
+      ) : (
+        <p className="flex items-center gap-2 text-sm text-muted">
+          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          กำลังคำนวณเส้นทาง เลือกจุดแวะ และจัดตารางรายวัน…
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PlanResult({
   draft,
+  plan,
   groups,
+  pending,
+  error,
   waypoints,
   onWaypointsChange,
+  onRecalculate,
+  onPlanChange,
+  tripId,
+  onSaved,
 }: {
   /** The answers the plan was drafted from. */
   draft: PlannerDraft;
+  plan: TripPlan;
   groups: PlaceGroupOption[];
+  pending: boolean;
+  error: string | null;
   /** Live custom-route points (edited on the map before recalculating). */
   waypoints: LatLng[];
   onWaypointsChange: (points: LatLng[]) => void;
+  onRecalculate: (points: LatLng[]) => void;
+  onPlanChange: (plan: TripPlan) => void;
+  tripId: string | null;
+  onSaved: (tripId: string) => void;
 }) {
-  const [plan, setPlan] = useState<TripPlan | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const [visible, setVisible] = useState<string[]>(() =>
     POI_CATEGORIES.map((c) => c.key).filter((k) => k !== "other"),
   );
@@ -64,30 +162,15 @@ export function PlanResult({
     past: [],
     future: [],
   });
-
-  const run = useCallback((d: PlannerDraft) => {
-    startTransition(async () => {
-      const res = await draftTripPlan(d);
-      if ("error" in res) {
-        setError(res.error);
-      } else {
-        setError(null);
-        setPlan(res.plan);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    run(draft);
-    // Re-run only when the submitted draft object changes.
-  }, [draft, run]);
+  const [addRequest, setAddRequest] = useState<AddRequest | null>(null);
+  const [saving, startSaving] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const groupColors = useMemo(
     () => Object.fromEntries(groups.map((g) => [g.key, g.color])),
     [groups],
   );
   const stops = useMemo(() => {
-    if (!plan) return [];
     let n = 0;
     return plan.days.flatMap((day) =>
       day.items
@@ -97,7 +180,7 @@ export function PlanResult({
   }, [plan]);
   const poiCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const p of plan?.pois ?? [])
+    for (const p of plan.pois)
       counts[poiCategoryOf(p.kind).key] = (counts[poiCategoryOf(p.kind).key] ?? 0) + 1;
     return counts;
   }, [plan]);
@@ -108,38 +191,32 @@ export function PlanResult({
     onWaypointsChange(next);
   };
 
-  if (!plan) {
-    return (
-      <div
-        className="rounded-card border-2 border-foreground bg-surface p-6 shadow-hard"
-        aria-live="polite"
-      >
-        {error ? (
-          <Callout tone="danger" title="ร่างแผนไม่สำเร็จ">
-            {error}
-            <div className="mt-2">
-              <Button variant="mini" onClick={() => run(draft)}>
-                <RefreshCw className="size-3.5" aria-hidden="true" /> ลองใหม่
-              </Button>
-            </div>
-          </Callout>
-        ) : (
-          <p className="flex items-center gap-2 text-sm text-muted">
-            <Loader2
-              className="size-4 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            กำลังคำนวณเส้นทาง เลือกจุดแวะ และจัดตารางรายวัน…
-          </p>
-        )}
-      </div>
-    );
-  }
+  /** Opens the add form on the day whose places are closest to this spot. */
+  const requestAdd = (
+    at: { latitude: number; longitude: number },
+    make: (date: string) => PlanItem,
+  ) => {
+    const dayIndex = closestDay(plan, at);
+    const date = plan.days.find((d) => d.index === dayIndex)?.date ?? plan.days[0].date;
+    setAddRequest({ key: Date.now(), dayIndex, item: make(date) });
+  };
+
+  const save = () =>
+    startSaving(async () => {
+      const res = await saveTrip(draft, plan);
+      if ("needLogin" in res) {
+        // The plan stays in this browser; signing in brings the user back here.
+        router.push("/login?next=/plan");
+      } else if ("error" in res) {
+        setSaveError(res.error);
+      } else {
+        setSaveError(null);
+        onSaved(res.id);
+      }
+    });
 
   const unit = FUEL_TYPES.find((f) => f.key === draft.vehicle.fuel)?.unit ?? "ลิตร";
-  const totalCost =
-    plan.days.flatMap((d) => d.items).reduce((n, i) => n + (i.costEstimate ?? 0), 0) +
-    plan.totals.fuelCost;
+  const totalCost = costTotals(plan).total;
   const tripDays = plan.days.length;
 
   return (
@@ -155,7 +232,7 @@ export function PlanResult({
         />
         <StatTile value={formatDuration(plan.totals.driveMin)} label="เวลาขับรวม ไม่รวมแวะ" />
         <StatTile value={`${tripDays} วัน ${Math.max(0, tripDays - 1)} คืน`} label="ระยะเวลาทริป" />
-        <StatTile value={plan.totals.stops} label="จุดแวะจากข้อมูล ททท." />
+        <StatTile value={stops.length} label="จุดแวะเที่ยวในแผน" />
         <StatTile
           value={baht(plan.totals.fuelCost)}
           label={`ค่าน้ำมัน (${plan.totals.fuelUnits.toFixed(1)} ${unit})`}
@@ -191,6 +268,7 @@ export function PlanResult({
             pois={plan.pois}
             visibleCategories={visible}
             groupColors={groupColors}
+            onAddPoi={(p) => requestAdd(p, (date) => itemFromPoi(p, date))}
             editing={
               draft.routeStyle === "custom"
                 ? {
@@ -273,11 +351,7 @@ export function PlanResult({
                   <Trash2 className="size-3.5" aria-hidden="true" /> ล้าง ({points.length})
                 </Button>
               </div>
-              <Button
-                className="w-full"
-                disabled={pending}
-                onClick={() => run({ ...draft, customWaypoints: points })}
-              >
+              <Button className="w-full" disabled={pending} onClick={() => onRecalculate(points)}>
                 <RefreshCw className="size-4" aria-hidden="true" /> คำนวณเส้นทางใหม่
               </Button>
             </div>
@@ -317,8 +391,16 @@ export function PlanResult({
         ))}
       </div>
 
-      <SectionTitle note="แก้ไขได้ในขั้นถัดไป">แผนรายวัน</SectionTitle>
-      <DayPlanList days={plan.days} />
+      <SectionTitle note="กด + เพื่อเพิ่มกิจกรรม แก้ไข เปลี่ยนแผน หรือเลือกที่พัก แล้วกดจบกิจกรรมทีละวัน">
+        แผนรายวัน
+      </SectionTitle>
+      <DayEditor
+        draft={draft}
+        plan={plan}
+        onChange={onPlanChange}
+        addRequest={addRequest}
+        onAddRequestDone={() => setAddRequest(null)}
+      />
 
       {plan.suggestions.length > 0 && (
         <>
@@ -346,12 +428,62 @@ export function PlanResult({
                     <span>ห่างเส้นทาง {formatDistance(s.distanceM)}</span>
                     {s.isSecondaryCity && <Badge tone="brand">เมืองรอง</Badge>}
                   </div>
+                  <Button
+                    variant="mini"
+                    className="mt-1"
+                    onClick={() => requestAdd(s, (date) => itemFromCandidate(s, date, draft))}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" /> เพิ่มลงแผนรายวัน
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         </>
       )}
+
+      <SectionTitle note="รวมค่าน้ำมันจากระยะทาง และค่าใช้จ่ายทุกรายการในแผนรายวัน">
+        สรุปค่าใช้จ่าย
+      </SectionTitle>
+      <CostSummary draft={draft} plan={plan} />
+
+      <SectionTitle note="จองทีละคืน กลับมาที่หน้านี้แล้วระบบจะถามต่อให้ ไม่ต้องเริ่มใหม่">
+        Checklist การจองที่พัก
+      </SectionTitle>
+      <BookingChecklist draft={draft} plan={plan} onChange={onPlanChange} />
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-card border-2 border-foreground bg-surface-3 px-4 py-4 shadow-hard">
+        <div className="min-w-0 space-y-0.5">
+          <p className="font-display text-lg font-bold">
+            {tripId ? "บันทึกเป็นแผนของฉันแล้ว" : "พร้อมออกเดินทางแล้วหรือยัง?"}
+          </p>
+          <p className="text-xs text-subtle">
+            {tripId ? (
+              <>
+                ดูได้ที่{" "}
+                <Link href="/trips" className="font-semibold text-info underline">
+                  แผนของฉัน
+                </Link>{" "}
+                · ถ้าแก้แผนแล้วกดบันทึกอีกครั้ง จะได้เป็นแผนใหม่
+              </>
+            ) : (
+              "บันทึกลงแผนของฉันเพื่อดูทริปที่จะถึง และกดเริ่มแผนพร้อม GPS เมื่อถึงวันเดินทาง (ต้องเข้าสู่ระบบ)"
+            )}
+          </p>
+          {saveError && <p className="text-xs font-semibold text-danger">{saveError}</p>}
+        </div>
+        <Button onClick={save} disabled={saving}>
+          {saving ? (
+            <Loader2
+              className="size-4 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <CalendarCheck className="size-4" aria-hidden="true" />
+          )}
+          {tripId ? "บันทึกอีกครั้ง" : "สร้างแผนของฉัน"}
+        </Button>
+      </div>
     </div>
   );
 }

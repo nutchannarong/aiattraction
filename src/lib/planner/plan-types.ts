@@ -37,6 +37,31 @@ export const PLATFORM_LABEL: Record<BookingPlatform, string> = {
   direct: "จองตรงกับที่พัก",
 };
 
+export type BookingStatus = "todo" | "opened" | "booked" | "skipped";
+
+export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
+  todo: "ยังไม่จอง",
+  opened: "เปิดเว็บจองแล้ว",
+  booked: "จองแล้ว",
+  skipped: "ไม่จอง / จัดการเอง",
+};
+
+export type BookingState = {
+  status: BookingStatus;
+  /** Price actually paid for the night (entered by the user). */
+  price: number | null;
+  url: string | null;
+  bookedAt: string | null;
+};
+
+export const LODGING_FILTERS: { key: string; label: string }[] = [
+  { key: "parking", label: "มีที่จอดรถ" },
+  { key: "breakfast", label: "มีอาหารเช้า" },
+  { key: "pets", label: "พาสัตว์เลี้ยงได้" },
+  { key: "pool", label: "มีสระว่ายน้ำ" },
+  { key: "free_cancel", label: "ยกเลิกฟรี" },
+];
+
 export type LodgingDetail = {
   type: LodgingType;
   minPrice: number | null;
@@ -48,6 +73,7 @@ export type LodgingDetail = {
   platform: BookingPlatform | null;
   website: string | null;
   stars: number | null;
+  booking?: BookingState;
 };
 
 export type PlanPlace = {
@@ -82,6 +108,8 @@ export type PlanItem = {
   warning: string | null;
   lodging: LodgingDetail | null;
   driveKm?: number | null;
+  /** Suggested parking near the place, e.g. "ลานจอด ฟรี · ลานจอดวัด" */
+  parking?: string | null;
 };
 
 export type DayPlan = {

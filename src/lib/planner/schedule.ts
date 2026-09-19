@@ -17,8 +17,8 @@ import type { PlannerDraft } from "./types";
 const DAY_START = 8 * 60;
 const DAY_END = 19 * 60;
 const REST_EVERY_MIN = 150;
-const MEAL_PER_PERSON = 150;
-const LODGING_PRICE: Record<string, number> = {
+export const MEAL_PER_PERSON = 150;
+export const LODGING_PRICE: Record<string, number> = {
   hotel: 1200,
   resort: 1800,
   guest_house: 700,
@@ -26,7 +26,7 @@ const LODGING_PRICE: Record<string, number> = {
   apartment: 800,
   motel: 500,
 };
-const LODGING_TYPE_BY_KIND: Record<string, LodgingType> = {
+export const LODGING_TYPE_BY_KIND: Record<string, LodgingType> = {
   hotel: "hotel",
   resort: "resort",
   guest_house: "daily_room",
@@ -42,13 +42,58 @@ export function hhmm(minutes: number) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-/** "ปิดทุกวันจันทร์" style warning when the free-text hours say the place is closed that weekday. */
+const OSM_DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const OSM_DAY_SPEC =
+  /^((?:(?:Mo|Tu|We|Th|Fr|Sa|Su|PH)(?:-(?:Mo|Tu|We|Th|Fr|Sa|Su))?\s*,?\s*)+)(.*)$/;
+
+/**
+ * Weekdays (0 = Sunday) an OSM `opening_hours` value says the place is open, or null when
+ * the value doesn't name days. Handles the common "Mo-Fr 08:00-17:00; Sa off" forms only.
+ */
+function osmOpenDays(value: string): Set<number> | null {
+  if (/24\/7/.test(value) || !/\b(Mo|Tu|We|Th|Fr|Sa|Su)\b/.test(value)) return null;
+  const open = new Set<number>();
+  const closed = new Set<number>();
+  for (const raw of value.split(";")) {
+    const rule = raw.trim();
+    if (!rule) continue;
+    const m = rule.match(OSM_DAY_SPEC);
+    if (!m) {
+      // Times without days apply to every day.
+      for (let d = 0; d < 7; d++) open.add(d);
+      continue;
+    }
+    const days = new Set<number>();
+    for (const part of m[1].split(",")) {
+      const [from, to] = part.trim().split("-");
+      const a = OSM_DAYS.indexOf(from);
+      if (a < 0) continue;
+      const b = to ? OSM_DAYS.indexOf(to) : a;
+      for (let i = 0; i < 7; i++) {
+        const d = (a + i) % 7;
+        days.add(d);
+        if (d === b) break;
+      }
+    }
+    const target = /\b(off|closed)\b/i.test(m[2]) ? closed : open;
+    days.forEach((d) => target.add(d));
+  }
+  closed.forEach((d) => open.delete(d));
+  return open;
+}
+
+/** Warning when the hours say the place is closed on that date's weekday (Thai text or OSM format). */
 export function closedWarning(openingHours: string | null, date: string): string | null {
   if (!openingHours) return null;
-  const day = THAI_DAYS[new Date(`${date}T00:00:00`).getDay()];
+  const weekday = new Date(`${date}T00:00:00`).getDay();
+  const day = THAI_DAYS[weekday];
   const text = openingHours.replace(/\s+/g, "");
   const re = new RegExp(`(ปิด|หยุด)[^,;.]{0,12}${day}`);
-  return re.test(text) ? `อาจปิดวัน${day} ตรวจสอบก่อนไป` : null;
+  if (re.test(text)) return `อาจปิดวัน${day} ตรวจสอบก่อนไป`;
+  const openDays = osmOpenDays(openingHours);
+  return openDays && !openDays.has(weekday)
+    ? `ปิดวัน${day}ตามเวลาเปิดในแผนที่ ตรวจสอบก่อนไป`
+    : null;
 }
 
 function visitMinutes(effort: number, easy: boolean) {
@@ -56,7 +101,7 @@ function visitMinutes(effort: number, easy: boolean) {
   return easy ? base + 15 : base;
 }
 
-function travellers(d: PlannerDraft) {
+export function travellers(d: PlannerDraft) {
   return d.travelers.adults + d.travelers.children + d.travelers.seniors;
 }
 
@@ -79,7 +124,7 @@ function placeFromCandidate(c: Candidate): PlanPlace {
   };
 }
 
-function placeFromPoi(p: RoutePoi): PlanPlace {
+export function placeFromPoi(p: RoutePoi): PlanPlace {
   return {
     source: "poi",
     id: p.id,
@@ -91,7 +136,9 @@ function placeFromPoi(p: RoutePoi): PlanPlace {
   };
 }
 
-function newItem(partial: Partial<PlanItem> & Pick<PlanItem, "kind" | "activity">): PlanItem {
+export function newItem(
+  partial: Partial<PlanItem> & Pick<PlanItem, "kind" | "activity">,
+): PlanItem {
   return {
     id: crypto.randomUUID(),
     start: null,
