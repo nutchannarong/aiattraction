@@ -1,8 +1,17 @@
 // Small pure helpers for editing a drafted plan in the browser.
 
 import { distanceMeters } from "../geo";
-import type { CostCategory, DayPlan, PlanItem, PlanPlace, TripPlan } from "./plan-types";
-import { hhmm } from "./schedule";
+import type { NearbyPlace } from "./nearby";
+import type {
+  CostCategory,
+  DayPlan,
+  LodgingDetail,
+  PlanItem,
+  PlanPlace,
+  TripPlan,
+} from "./plan-types";
+import { admissionFor, closedWarning, hhmm, LODGING_TYPE_BY_KIND, newItem } from "./schedule";
+import type { PlannerDraft } from "./types";
 
 export function minutesOf(time: string | null): number | null {
   if (!time) return null;
@@ -157,4 +166,49 @@ export function costTotals(plan: TripPlan) {
   }
   const total = Object.values(totals).reduce((a, b) => a + b, 0);
   return { totals, total };
+}
+
+/** Booking details for a stay picked outside the lodging picker (map pin, assistant card). */
+export function lodgingFor(
+  kind: string | null | undefined,
+  extra: { website?: string | null; stars?: number | null } = {},
+): LodgingDetail {
+  return {
+    type: LODGING_TYPE_BY_KIND[kind ?? ""] ?? "hotel",
+    minPrice: null,
+    maxPrice: null,
+    filters: ["parking"],
+    prices: {},
+    platform: null,
+    website: extra.website ?? null,
+    stars: extra.stars ?? null,
+  };
+}
+
+/** A new daily-plan row for a place found nearby (assistant cards, search results). */
+export function itemFromNearby(p: NearbyPlace, date: string, draft: PlannerDraft): PlanItem {
+  if (p.place.source === "attraction") {
+    const fee = admissionFor({ feeTh: p.feeTh, feeThKid: p.feeThKid }, draft);
+    return newItem({
+      kind: "attraction",
+      activity: `เที่ยว ${p.kindLabel}`,
+      place: p.place,
+      phone: p.phone,
+      openingHours: p.openingHours,
+      warning: closedWarning(p.openingHours, date),
+      costEstimate: fee || null,
+      costCategory: fee ? "admission" : null,
+    });
+  }
+  const category = COST_CATEGORY_FOR_KIND[p.place.category ?? ""] ?? null;
+  return newItem({
+    kind: category === "lodging" ? "lodging" : category === "food" ? "meal" : "poi",
+    activity: `แวะ${p.kindLabel}`,
+    place: p.place,
+    phone: p.phone,
+    openingHours: p.openingHours,
+    warning: closedWarning(p.openingHours, date),
+    costCategory: category,
+    lodging: category === "lodging" ? lodgingFor(p.place.category, p) : null,
+  });
 }

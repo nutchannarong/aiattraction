@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { StepSection } from "@/components/ui/step-section";
 import type { FuelPrice } from "@/lib/fuel";
+import { addMinutes, closestDay, firstGap, itemFromNearby } from "@/lib/planner/edit";
+import type { NearbyPlace } from "@/lib/planner/nearby";
 import type { PlaceGroupOption, PlaceRef, PlannerDraft } from "@/lib/planner/types";
 import {
   interestsSummary,
@@ -21,6 +23,8 @@ import {
   whoSummary,
 } from "./steps";
 import { draftTripPlan } from "./actions";
+import { AssistantChat } from "./assistant-chat";
+import type { AddRequest } from "./day-editor";
 import { PlanLoading, PlanResult } from "./plan-result";
 import { usePlannerDraft } from "./use-planner-draft";
 import { useSavedPlan } from "./use-saved-plan";
@@ -48,10 +52,8 @@ export function missingForStep(d: PlannerDraft, step: number): string | null {
       return "เลือกช่วงวัยของผู้ใหญ่";
     if (!d.occasion) return "เลือกโอกาสในการเดินทาง";
   }
-  if (step === 3 && d.interests.length === 0)
-    return "เลือกแนวท่องเที่ยวอย่างน้อย 1 แนว";
-  if (step === 4 && d.stopKinds.length === 0)
-    return "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ";
+  if (step === 3 && d.interests.length === 0) return "เลือกแนวท่องเที่ยวอย่างน้อย 1 แนว";
+  if (step === 4 && d.stopKinds.length === 0) return "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ";
   if (step === 5 && !(d.vehicle.fuelPrice > 0)) return "ใส่ราคาน้ำมัน";
   return null;
 }
@@ -72,7 +74,18 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
   const [requested, setRequested] = useState<PlannerDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [addRequest, setAddRequest] = useState<AddRequest | null>(null);
   const missing = missingForPlan(draft);
+
+  /** Opens the add form for a place the assistant suggested, on the closest day. */
+  const addFromAssistant = (p: NearbyPlace) => {
+    if (!saved) return;
+    const dayIndex = closestDay(saved.plan, p.place);
+    const day = saved.plan.days.find((d) => d.index === dayIndex) ?? saved.plan.days[0];
+    const start = firstGap(day);
+    const item = { ...itemFromNearby(p, day.date, saved.draft), start, end: addMinutes(start, 60) };
+    setAddRequest({ key: Date.now(), dayIndex: day.index, item });
+  };
   const stepErrors = [1, 2, 3, 4, 5].map((step) => missingForStep(draft, step));
 
   const compute = (d: PlannerDraft) => {
@@ -219,11 +232,20 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
             onPlanChange={editPlan}
             tripId={saved.tripId}
             onSaved={markSaved}
+            addRequest={addRequest}
+            onAddRequest={setAddRequest}
           />
         ) : (
           requested && <PlanLoading error={error} onRetry={() => compute(requested)} />
         )}
       </div>
+
+      <AssistantChat
+        draft={draft}
+        plan={saved?.plan ?? null}
+        groups={groups}
+        onAddPlace={saved ? addFromAssistant : null}
+      />
     </div>
   );
 }

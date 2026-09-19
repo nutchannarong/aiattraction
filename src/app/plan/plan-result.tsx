@@ -32,7 +32,13 @@ import {
 import { FUEL_TYPES } from "@/lib/fuel";
 import { saveLocalTrip } from "@/lib/local-trips";
 import { poiKindLabel } from "@/lib/places";
-import { closestDay, COST_CATEGORY_FOR_KIND, costTotals, orderTripItems } from "@/lib/planner/edit";
+import {
+  closestDay,
+  COST_CATEGORY_FOR_KIND,
+  costTotals,
+  lodgingFor,
+  orderTripItems,
+} from "@/lib/planner/edit";
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
 import type { Candidate, PlanItem, RoutePoi, TripPlan } from "@/lib/planner/plan-types";
 import { admissionFor, closedWarning, newItem } from "@/lib/planner/schedule";
@@ -83,6 +89,7 @@ function itemFromPoi(p: RoutePoi, date: string): PlanItem {
     openingHours: p.openingHours,
     warning: closedWarning(p.openingHours, date),
     costCategory: category,
+    lodging: category === "lodging" ? lodgingFor(p.kind, p) : null,
   });
 }
 
@@ -146,6 +153,8 @@ export function PlanResult({
   onPlanChange,
   tripId,
   onSaved,
+  addRequest,
+  onAddRequest,
 }: {
   /** The answers the plan was drafted from. */
   draft: PlannerDraft;
@@ -160,6 +169,9 @@ export function PlanResult({
   onPlanChange: (plan: TripPlan) => void;
   tripId: string | null;
   onSaved: (tripId: string) => void;
+  /** Pending "add to daily plan" (from the map, suggestions or the AI assistant). */
+  addRequest: AddRequest | null;
+  onAddRequest: (request: AddRequest | null) => void;
 }) {
   const router = useRouter();
   const [visible, setVisible] = useState<string[]>(() =>
@@ -170,7 +182,6 @@ export function PlanResult({
     past: [],
     future: [],
   });
-  const [addRequest, setAddRequest] = useState<AddRequest | null>(null);
   const [saving, startSaving] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [snapRoad, setSnapRoad] = useState(true);
@@ -215,7 +226,7 @@ export function PlanResult({
   ) => {
     const dayIndex = closestDay(plan, at);
     const date = plan.days.find((d) => d.index === dayIndex)?.date ?? plan.days[0].date;
-    setAddRequest({ key: Date.now(), dayIndex, item: make(date) });
+    onAddRequest({ key: Date.now(), dayIndex, item: make(date) });
   };
 
   const save = () =>
@@ -450,7 +461,7 @@ export function PlanResult({
         plan={plan}
         onChange={onPlanChange}
         addRequest={addRequest}
-        onAddRequestDone={() => setAddRequest(null)}
+        onAddRequestDone={() => onAddRequest(null)}
       />
 
       {plan.suggestions.length > 0 && (
