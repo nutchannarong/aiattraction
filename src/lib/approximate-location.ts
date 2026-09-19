@@ -20,9 +20,12 @@ export function getApproximateLocation(headers: Headers): ApproximateLocation | 
   const longitude = Number(headers.get("x-vercel-ip-longitude"));
   if (!headers.get("x-vercel-ip-latitude") || !isValidCoordinates(latitude, longitude)) return null;
 
-  const label =
-    [decode(headers.get("x-vercel-ip-city")), headers.get("x-vercel-ip-country")]
-      .filter(Boolean)
-      .join(", ") || "ไม่ทราบเมือง";
+  const city = decode(headers.get("x-vercel-ip-city"));
+  const country = headers.get("x-vercel-ip-country");
+  const countryName = country === "TH" ? "ประเทศไทย" : country;
+  // Without a city the point is only a country-level centroid, so say so.
+  const label = city
+    ? [city, countryName].filter(Boolean).join(", ") + " (ระดับเมือง)"
+    : `${countryName ?? "ไม่ทราบพื้นที่"} (หยาบมาก อาจคลาดเคลื่อนหลายสิบกิโลเมตร)`;
   return { latitude, longitude, label };
 }

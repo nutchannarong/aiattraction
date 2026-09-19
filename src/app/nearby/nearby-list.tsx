@@ -79,7 +79,7 @@ export function NearbyList() {
         )}
         {approximateLabel ? (
           <span className="text-sm text-muted">
-            ตำแหน่งโดยประมาณจากเครือข่าย: {approximateLabel} (ระดับเมือง)
+            ตำแหน่งโดยประมาณจากเครือข่าย: {approximateLabel}
           </span>
         ) : (
           state.status === "ready" && (

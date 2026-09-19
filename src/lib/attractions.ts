@@ -11,6 +11,14 @@ export const CATEGORIES: Record<number, string> = {
   3: "แหล่งท่องเที่ยวสำหรับกิจกรรมพิเศษ นันทนาการ และความสนใจพิเศษ",
 };
 
+// The source data uses these in place of an empty English name.
+const PLACEHOLDER_TEXT = new Set(["ไม่มี", "-", "--", "ไม่ระบุ"]);
+
+function withCleanNameEn<T extends { att_name_en: string | null }>(row: T): T {
+  const nameEn = row.att_name_en?.trim();
+  return { ...row, att_name_en: nameEn && !PLACEHOLDER_TEXT.has(nameEn) ? nameEn : null };
+}
+
 const LIST_COLUMNS =
   "att_id, att_name_th, att_name_en, att_category, att_type_label, province_name_th, district_name_th, att_start_end, att_fee_th";
 
@@ -108,7 +116,7 @@ export async function searchAttractions(filters: AttractionFilters) {
   if (error) throw new Error(`Failed to load attractions: ${error.message}`);
 
   return {
-    items: data ?? [],
+    items: (data ?? []).map(withCleanNameEn),
     total: count ?? 0,
     page,
     pageCount: Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE)),
@@ -123,7 +131,7 @@ export const getAttraction = cache(async (id: string) => {
     .eq("att_id", id)
     .maybeSingle<Attraction>();
   if (error) throw new Error(`Failed to load attraction: ${error.message}`);
-  return data;
+  return data && withCleanNameEn(data);
 });
 
 export async function getFilterOptions() {
@@ -194,5 +202,5 @@ export async function getNearbyAttractions(
   });
   if (error) throw new Error(`Failed to load nearby attractions: ${error.message}`);
   // .returns<T>() doesn't type-check on rpc() with an untyped client.
-  return (data ?? []) as NearbyAttraction[];
+  return ((data ?? []) as NearbyAttraction[]).map(withCleanNameEn);
 }
