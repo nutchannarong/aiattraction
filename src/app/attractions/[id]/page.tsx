@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { AttractionMap, hasValidCoordinates } from "@/components/attraction-map";
+import { WeatherCard, WeatherCardSkeleton } from "@/components/weather-card";
 import { CATEGORIES, getAttraction, htmlToText, toExternalUrl } from "@/lib/attractions";
 
 export async function generateMetadata({
@@ -91,18 +93,25 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-6 rounded-xl border border-border bg-surface p-5">
-          <Section title="รายละเอียด" text={a.att_detail_th} />
-          <Section title="Description" text={a.att_detail_en} />
-          <Section title="ไฮไลต์" text={a.att_hilight} />
-          <Section title="กิจกรรม" text={a.att_activity} />
-          <Section title="การเดินทาง" text={a.att_accessibility} />
-          <Section title="สถานที่ใกล้เคียง" text={a.att_nearby_location} />
-          <Section title="สิ่งอำนวยความสะดวก" text={a.att_facilities_contact} />
-          <Section title="ข้อควรปฏิบัติ" text={a.att_rule} />
-          <Section title="การเตรียมตัว" text={a.att_traveler_pre} />
-          <Section title="การจอง" text={a.att_booking_detail} />
-          <Section title="หมายเหตุ" text={a.att_remark} />
+        <div className="space-y-6">
+          {hasMap && (
+            <Suspense fallback={<WeatherCardSkeleton />}>
+              <WeatherCard latitude={a.latitude!} longitude={a.longitude!} />
+            </Suspense>
+          )}
+          <div className="space-y-6 rounded-xl border border-border bg-surface p-5">
+            <Section title="รายละเอียด" text={a.att_detail_th} />
+            <Section title="Description" text={a.att_detail_en} />
+            <Section title="ไฮไลต์" text={a.att_hilight} />
+            <Section title="กิจกรรม" text={a.att_activity} />
+            <Section title="การเดินทาง" text={a.att_accessibility} />
+            <Section title="สถานที่ใกล้เคียง" text={a.att_nearby_location} />
+            <Section title="สิ่งอำนวยความสะดวก" text={a.att_facilities_contact} />
+            <Section title="ข้อควรปฏิบัติ" text={a.att_rule} />
+            <Section title="การเตรียมตัว" text={a.att_traveler_pre} />
+            <Section title="การจอง" text={a.att_booking_detail} />
+            <Section title="หมายเหตุ" text={a.att_remark} />
+          </div>
         </div>
 
         <aside className="space-y-4 self-start rounded-xl border border-border bg-surface p-5 text-sm">
