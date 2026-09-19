@@ -44,16 +44,16 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
       <StickerCard tape className="space-y-3 p-5">
         <p className="text-xs font-bold text-subtle">เลือกวิธีเข้าสู่ระบบ</p>
-        <form action={signInWithFacebook}>
+        {/* <form action={signInWithFacebook}>
           <input type="hidden" name="next" value={next} />
           <button className={social}>
             <FacebookIcon />
             ดำเนินการด้วย Facebook
           </button>
-        </form>
+        </form> */}
         <form action={signInWithGoogle}>
           <input type="hidden" name="next" value={next} />
-          <button className={social}>
+          <button className={`${social} cursor-pointer hover:bg-surface-2 hover:shadow-hard-sm focus-visible:bg-surface-2 active:shadow-none`}>
             <GoogleIcon />
             ดำเนินการด้วย Google
           </button>
