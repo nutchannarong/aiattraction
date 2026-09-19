@@ -20,7 +20,7 @@ function withCleanNameEn<T extends { att_name_en: string | null }>(row: T): T {
 }
 
 const LIST_COLUMNS =
-  "att_id, att_name_th, att_name_en, att_category, att_type_label, province_name_th, district_name_th, att_start_end, att_fee_th";
+  "att_id, att_name_th, att_name_en, att_category, att_type_label, province_name_th, district_name_th, att_start_end, att_fee_th, latitude, longitude";
 
 export type AttractionSummary = {
   att_id: string;
@@ -32,6 +32,8 @@ export type AttractionSummary = {
   district_name_th: string | null;
   att_start_end: string | null;
   att_fee_th: number | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type Attraction = AttractionSummary & {

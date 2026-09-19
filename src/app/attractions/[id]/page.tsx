@@ -137,14 +137,16 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
               ))}
           </dl>
           {mapUrl && (
-            <a
-              href={mapUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block rounded-lg bg-accent px-4 py-2 text-center font-medium text-white dark:text-black"
-            >
-              เปิดใน Google Maps
-            </a>
+            <div className="space-y-2">
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg bg-accent px-4 py-2 text-center font-medium text-white dark:text-black"
+              >
+                เปิดใน Google Maps
+              </a>
+            </div>
           )}
           {links.length > 0 && (
             <ul className="flex flex-wrap gap-3">

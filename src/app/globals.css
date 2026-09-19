@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   /* Brand: orange + turquoise from the ไทยไหนดี logo, darkened where needed for 4.5:1 text contrast. */
@@ -43,4 +44,33 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.leaflet-container {
+  z-index: 0;
+  font-family: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
+}
+
+.route-poi-marker {
+  align-items: center;
+  border: 2px solid white;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+  display: flex;
+  font-size: 16px;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.route-poi-fuel {
+  background: #ef4444;
+}
+
+.route-poi-rest {
+  background: #f59e0b;
+}
+
+.route-poi-services {
+  background: #8b5cf6;
 }
