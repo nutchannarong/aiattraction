@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AttractionMap, hasValidCoordinates } from "@/components/attraction-map";
 import { CATEGORIES, getAttraction, htmlToText, toExternalUrl } from "@/lib/attractions";
 
 export async function generateMetadata({
@@ -68,10 +69,10 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
     ["YouTube", toExternalUrl(a.att_youtube)],
   ].filter((l): l is [string, string] => Boolean(l[1]));
 
-  const mapUrl =
-    a.latitude != null && a.longitude != null
-      ? `https://www.google.com/maps/search/?api=1&query=${a.latitude},${a.longitude}`
-      : null;
+  const hasMap = hasValidCoordinates(a.latitude, a.longitude);
+  const mapUrl = hasMap
+    ? `https://www.google.com/maps/search/?api=1&query=${a.latitude},${a.longitude}`
+    : null;
 
   return (
     <article className="space-y-6">
@@ -105,6 +106,9 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
         </div>
 
         <aside className="space-y-4 self-start rounded-xl border border-border bg-surface p-5 text-sm">
+          {hasMap && (
+            <AttractionMap latitude={a.latitude!} longitude={a.longitude!} name={a.att_name_th} />
+          )}
           <dl className="space-y-3">
             {info
               .filter(([, v]) => v)
