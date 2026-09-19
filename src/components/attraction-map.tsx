@@ -27,7 +27,7 @@ export function AttractionMap({ latitude, longitude, name }: Props) {
       src={embedUrl(latitude, longitude)}
       loading="lazy"
       referrerPolicy="no-referrer-when-downgrade"
-      className="aspect-[4/3] w-full rounded-lg border border-border"
+      className="aspect-4/3 w-full rounded-lg border border-border"
     />
   );
 }
