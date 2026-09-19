@@ -192,3 +192,18 @@
 .route-poi-services {
   background: #8b5cf6;
 }
+
+/* Leaflet popups follow the theme (sticker style) so token colours stay readable in dark mode. */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--foreground);
+}
+.leaflet-popup-content-wrapper {
+  border: 2px solid var(--foreground);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--hard-ink);
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--subtle);
+}

@@ -70,7 +70,10 @@ export function PlacePicker({
 }) {
   const listId = useId();
   const [query, setQuery] = useState("");
-  const [found, setFound] = useState<{ q: string; items: PlaceSearchResult[] }>({ q: "", items: [] });
+  const [found, setFound] = useState<{ q: string; items: PlaceSearchResult[] }>({
+    q: "",
+    items: [],
+  });
   const [active, setActive] = useState(0);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [pinning, setPinning] = useState(false);
@@ -249,11 +252,14 @@ export function PlacePicker({
       </div>
       {status === "loading" && <p className="text-xs text-subtle">กำลังค้นหา…</p>}
       {status === "error" && <p className="text-xs text-danger">ค้นหาไม่สำเร็จ กรุณาลองใหม่</p>}
-      {query.trim().length >= 2 && found.q === query.trim() && status === "idle" && results.length === 0 && (
-        <p className="text-xs text-subtle">
-          ไม่พบสถานที่ ลองพิมพ์ชื่อจังหวัดหรืออำเภอ หรือปักหมุดบนแผนที่
-        </p>
-      )}
+      {query.trim().length >= 2 &&
+        found.q === query.trim() &&
+        status === "idle" &&
+        results.length === 0 && (
+          <p className="text-xs text-subtle">
+            ไม่พบสถานที่ ลองพิมพ์ชื่อจังหวัดหรืออำเภอ หรือปักหมุดบนแผนที่
+          </p>
+        )}
 
       <div className="flex flex-wrap gap-2">
         <Button variant="mini" onClick={() => void locate()} disabled={geo.status === "locating"}>

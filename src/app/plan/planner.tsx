@@ -131,7 +131,14 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince }: Plan
       </div>
 
       <div id="plan-result" className="scroll-mt-24">
-        {submitted && <PlanResult draft={submitted} groups={groups} />}
+        {submitted && (
+          <PlanResult
+            draft={submitted}
+            groups={groups}
+            waypoints={draft.customWaypoints}
+            onWaypointsChange={(customWaypoints) => patch({ customWaypoints })}
+          />
+        )}
       </div>
     </div>
   );
