@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 export const PAGE_SIZE = 24;
 
@@ -86,7 +86,7 @@ export async function searchAttractions(filters: AttractionFilters) {
   const page = Math.max(1, filters.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
 
-  let query = supabase
+  let query = getSupabase()
     .from("attraction")
     .select(LIST_COLUMNS, { count: "exact" })
     .order("att_name_th")
@@ -116,7 +116,7 @@ export async function searchAttractions(filters: AttractionFilters) {
 
 // cache() dedupes the call shared by generateMetadata and the page.
 export const getAttraction = cache(async (id: string) => {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("attraction")
     .select("*")
     .eq("att_id", id)
@@ -127,12 +127,12 @@ export const getAttraction = cache(async (id: string) => {
 
 export async function getFilterOptions() {
   const [types, provinces] = await Promise.all([
-    supabase
+    getSupabase()
       .from("attraction_type_options")
       .select("*")
       .order("att_type_label")
       .returns<TypeOption[]>(),
-    supabase
+    getSupabase()
       .from("attraction_province_options")
       .select("*")
       .order("province_name_th")
