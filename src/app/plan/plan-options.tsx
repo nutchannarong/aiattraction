@@ -204,7 +204,7 @@ export function PlanOptions({
                 )}
               >
                 <Sparkles className="size-3.5 text-accent" aria-hidden="true" />
-                AI แนะนำเส้นนี้
+                ให้ AI แนะนำเส้นทาง
               </button>
             </div>
           );
