@@ -19,6 +19,7 @@ const draftSchema = z
     version: z.literal(1),
     origin: placeSchema,
     destination: placeSchema,
+    tripType: z.enum(["round", "one_way"]).optional(),
     startDate: z.iso.date(),
     endDate: z.iso.date(),
     travelers: z.object({
@@ -31,10 +32,7 @@ const draftSchema = z
     interests: z.array(z.string().max(20)).min(1, "เลือกแนวท่องเที่ยวอย่างน้อย 1 แนว").max(13),
     interestTypes: z.array(z.int()).max(100),
     balanced: z.boolean(),
-    stopKinds: z
-      .array(z.string().max(20))
-      .min(1, "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ")
-      .max(20),
+    stopKinds: z.array(z.string().max(20)).min(1, "เลือกประเภทจุดแวะอย่างน้อย 1 แบบ").max(20),
     vehicle: z
       .object({
         type: z.enum(["motorcycle", "eco_car", "sedan", "suv", "pickup", "van", "bus"]),
@@ -48,7 +46,7 @@ const draftSchema = z
     customWaypoints: z.array(z.object({ lat, lng })).max(15),
   })
   .loose()
-  .refine((d) => d.endDate >= d.startDate, "วันกลับต้องไม่ก่อนวันออกเดินทาง")
+  .refine((d) => d.endDate >= d.startDate, "วันสุดท้ายของทริปต้องไม่ก่อนวันออกเดินทาง")
   .refine((d) => {
     const start = new Date(`${d.startDate}T00:00:00Z`).getTime();
     const end = new Date(`${d.endDate}T00:00:00Z`).getTime();
@@ -75,8 +73,7 @@ type RouteGroupRow = {
 };
 
 export type RoutePlaceGroupsResult =
-  | { groups: PlaceGroupOption[]; provinces: string[]; total: number }
-  | { error: string };
+  { groups: PlaceGroupOption[]; provinces: string[]; total: number } | { error: string };
 
 /** Counts themes inside a 50 km geographic corridor between the two selected points. */
 export async function findRoutePlaceGroups(input: {

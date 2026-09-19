@@ -38,7 +38,7 @@ export function missingForStep(d: PlannerDraft, step: number): string | null {
     if (!d.origin) return "เลือกจุดออกเดินทาง";
     if (!d.destination) return "เลือกจุดหมายปลายทาง";
     const days = daysBetween(d.startDate, d.endDate);
-    if (days < 1) return "วันกลับต้องไม่ก่อนวันออกเดินทาง";
+    if (days < 1) return "วันสุดท้ายของทริปต้องไม่ก่อนวันออกเดินทาง";
     if (days > 14) return "เลือกช่วงเดินทางไม่เกิน 14 วัน";
   }
   if (step === 2) {

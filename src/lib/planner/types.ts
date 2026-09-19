@@ -103,11 +103,26 @@ export const ROUTE_STYLES: { key: RouteStyle; label: string; hint: string }[] = 
 
 export type LatLng = { lat: number; lng: number };
 
+/** Round trip plans the drive home on the last day; one-way ends at the destination. */
+export type TripType = "round" | "one_way";
+
+export const TRIP_TYPES: { key: TripType; label: string; hint: string }[] = [
+  { key: "round", label: "ไป-กลับ", hint: "วันสุดท้ายขับกลับจุดเริ่มต้น" },
+  { key: "one_way", label: "ไปอย่างเดียว", hint: "จบทริปที่ปลายทาง ไม่คิดขากลับ" },
+];
+
+export function isOneWay(d: Pick<PlannerDraft, "tripType">) {
+  return d.tripType === "one_way";
+}
+
 export type PlannerDraft = {
   version: 1;
   origin: PlaceRef | null;
   destination: PlaceRef | null;
+  /** Missing on drafts saved before this option existed: treat as round trip. */
+  tripType?: TripType;
   startDate: string;
+  /** Round trip: the day you drive home. One-way: the last day of the trip. */
   endDate: string;
   travelers: Travelers;
   occasion: Occasion | null;

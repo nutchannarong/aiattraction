@@ -32,12 +32,7 @@ import {
 import { FUEL_TYPES } from "@/lib/fuel";
 import { saveLocalTrip } from "@/lib/local-trips";
 import { poiKindLabel } from "@/lib/places";
-import {
-  closestDay,
-  COST_CATEGORY_FOR_KIND,
-  costTotals,
-  orderTripItems,
-} from "@/lib/planner/edit";
+import { closestDay, COST_CATEGORY_FOR_KIND, costTotals, orderTripItems } from "@/lib/planner/edit";
 import { POI_CATEGORIES, poiCategoryOf } from "@/lib/planner/poi-categories";
 import type { Candidate, PlanItem, RoutePoi, TripPlan } from "@/lib/planner/plan-types";
 import { admissionFor, closedWarning, newItem } from "@/lib/planner/schedule";
@@ -253,7 +248,7 @@ export function PlanResult({
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile
           value={`${Math.round(plan.totals.distanceKm).toLocaleString("th-TH")} กม.`}
-          label="ระยะทางรวม (ไป-กลับ)"
+          label={plan.inbound ? "ระยะทางรวม (ไป-กลับ)" : "ระยะทาง (ขาไปอย่างเดียว)"}
         />
         <StatTile value={formatDuration(plan.totals.driveMin)} label="เวลาขับรวม ไม่รวมแวะ" />
         <StatTile value={`${tripDays} วัน ${Math.max(0, tripDays - 1)} คืน`} label="ระยะเวลาทริป" />
@@ -337,8 +332,12 @@ export function PlanResult({
           <div className="space-y-1 border-t-[1.5px] border-dashed border-border pt-2 text-xs text-muted">
             <p>
               <span className="mr-1 inline-block h-1 w-5 rounded bg-brand align-middle" /> ขาไป
-              <span className="ml-3 mr-1 inline-block h-0 w-5 border-t-2 border-dashed border-secondary align-middle" />{" "}
-              ขากลับ
+              {plan.inbound && (
+                <>
+                  <span className="ml-3 mr-1 inline-block h-0 w-5 border-t-2 border-dashed border-secondary align-middle" />{" "}
+                  ขากลับ
+                </>
+              )}
             </p>
             <p>หมุดตัวเลข = จุดแวะตามแผน · A ต้นทาง · B ปลายทาง</p>
           </div>
@@ -352,7 +351,9 @@ export function PlanResult({
               <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 p-2.5">
                 <div>
                   <p className="text-xs font-bold">เกาะถนนอัตโนมัติ</p>
-                  <p className="text-[11px] text-subtle">ยึดกับเส้นถนนที่คำนวณอยู่ โดยไม่ส่งพิกัดออกเพิ่ม</p>
+                  <p className="text-[11px] text-subtle">
+                    ยึดกับเส้นถนนที่คำนวณอยู่ โดยไม่ส่งพิกัดออกเพิ่ม
+                  </p>
                 </div>
                 <Toggle
                   label="เกาะถนนอัตโนมัติ"
@@ -394,7 +395,9 @@ export function PlanResult({
                 <Button
                   variant="mini"
                   disabled={points.length < 2}
-                  onClick={() => setPoints(sortWaypointsAlongRoute(points, plan.outbound.coordinates))}
+                  onClick={() =>
+                    setPoints(sortWaypointsAlongRoute(points, plan.outbound.coordinates))
+                  }
                 >
                   <ListOrdered className="size-3.5" aria-hidden="true" /> เรียง waypoint
                 </Button>

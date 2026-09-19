@@ -5,7 +5,7 @@ import { isoDate } from "./draft";
 import type { Candidate, PlanPlace, RouteLine, RoutePoi, TripPlan } from "./plan-types";
 import { buildSchedule } from "./schedule";
 import { pickBalanced, scoreCandidate } from "./scoring";
-import type { LatLng, PlannerDraft, StopKind } from "./types";
+import { isOneWay, type LatLng, type PlannerDraft, type StopKind } from "./types";
 import { vehicleEfficiency, vehicleTypeInfo } from "./vehicles";
 
 export const MAX_TRIP_DAYS = 14;
@@ -212,10 +212,12 @@ export async function buildTripPlan(draft: PlannerDraft): Promise<TripPlan> {
   }
 
   const dates = tripDates(draft.startDate, draft.endDate);
-  // Coming home: the plain route reversed (no second routing call).
+  // Coming home: the plain route reversed (no second routing call). One-way trips end there.
   const baseLine = lineOf(base);
   const inbound: RouteLine | null =
-    dates.length >= 2 ? { ...baseLine, coordinates: [...baseLine.coordinates].reverse() } : null;
+    !isOneWay(draft) && dates.length >= 2
+      ? { ...baseLine, coordinates: [...baseLine.coordinates].reverse() }
+      : null;
   const outboundLine = outbound === base ? baseLine : lineOf(outbound);
 
   const line = toGeoJsonLine(simplifyToMax(outboundLine.coordinates, 300));
@@ -313,7 +315,11 @@ export async function buildTripPlan(draft: PlannerDraft): Promise<TripPlan> {
 
   const notes = [
     "เวลาเดินทางเป็นค่าประมาณจากข้อมูลถนน OpenStreetMap ไม่รวมสภาพจราจรจริง",
-    "ระยะทางรวมนับทั้งขาไปและขากลับ",
+    inbound
+      ? "ระยะทางรวมนับทั้งขาไปและขากลับ"
+      : isOneWay(draft)
+        ? "แผนไปอย่างเดียว: ระยะทาง เวลา และค่าน้ำมันนับเฉพาะขาไป"
+        : "ทริปวันเดียว: นับเฉพาะขาไป ถ้าจะขับกลับวันเดียวกันให้เลือกวันกลับเพิ่มอีกวัน",
   ];
   if (outbound.engine === "osrm") notes.push("ระบบนำทางหลักไม่ตอบ จึงใช้เส้นทางสำรองแบบเร็วที่สุด");
   if (dates.length === MAX_TRIP_DAYS && draft.endDate > dates[dates.length - 1]) {

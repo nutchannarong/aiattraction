@@ -72,7 +72,11 @@ function Month({
     <section className={className} aria-label={monthLabel(month)}>
       <h4 className="mb-3 text-center font-display text-sm font-bold">{monthLabel(month)}</h4>
       <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-subtle">
-        {WEEKDAYS.map((day) => <span key={day} className="py-1">{day}</span>)}
+        {WEEKDAYS.map((day) => (
+          <span key={day} className="py-1">
+            {day}
+          </span>
+        ))}
       </div>
       <div className="grid grid-cols-7 gap-y-1">
         {cells.map((date, index) => {
@@ -110,10 +114,13 @@ export function DateRangeCalendar({
   end,
   today,
   onChange,
+  endLabel = "เดินทางกลับ",
 }: {
   start: string;
   end: string;
   today: string;
+  /** Name for the end date, e.g. "วันสุดท้ายของทริป" on one-way trips. */
+  endLabel?: string;
   onChange: (range: { startDate: string; endDate: string }) => void;
 }) {
   const [selecting, setSelecting] = useState<Selecting>("start");
@@ -167,7 +174,7 @@ export function DateRangeCalendar({
             selecting === "end" ? "border-secondary shadow-hard-sm" : "border-border",
           )}
         >
-          <span className="block text-[11px] font-bold text-subtle">เดินทางกลับ</span>
+          <span className="block text-[11px] font-bold text-subtle">{endLabel}</span>
           <strong className="mt-1 block font-display text-sm">{thaiDate(end)}</strong>
           <span className="mt-1 block text-xs text-subtle">{weekday(end)}</span>
         </button>
@@ -185,7 +192,9 @@ export function DateRangeCalendar({
             <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
           <p className="text-center font-display text-sm font-bold">
-            {selecting === "start" ? "เลือกวันออกเดินทาง" : "เลือกวันเดินทางกลับ"}
+            {selecting === "start"
+              ? "เลือกวันออกเดินทาง"
+              : `เลือกวัน${endLabel.replace(/^วัน/, "")}`}
           </p>
           <button
             type="button"
@@ -208,8 +217,12 @@ export function DateRangeCalendar({
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t-[1.5px] border-dashed border-border pt-3 text-xs text-subtle">
-          <span>{thaiDate(start)} → {thaiDate(end)}</span>
-          <strong className="font-mono text-foreground">{days} วัน {Math.max(0, days - 1)} คืน</strong>
+          <span>
+            {thaiDate(start)} → {thaiDate(end)}
+          </span>
+          <strong className="font-mono text-foreground">
+            {days} วัน {Math.max(0, days - 1)} คืน
+          </strong>
         </div>
       </div>
     </div>

@@ -78,7 +78,7 @@ export function BookingChecklist({
   }, [awaiting]);
 
   if (nights.length === 0) {
-    return <p className="text-sm text-subtle">ทริปไปเช้าเย็นกลับ ไม่ต้องจองที่พัก</p>;
+    return <p className="text-sm text-subtle">ทริปวันเดียว ไม่มีคืนที่ต้องจองที่พัก</p>;
   }
 
   const done = nights.filter(isDone).length;

@@ -21,9 +21,11 @@ import { cn } from "@/lib/cn";
 import { FUEL_TYPES, type FuelKey, type FuelPrice } from "@/lib/fuel";
 import {
   ADULT_AGES,
+  isOneWay,
   OCCASIONS,
   ROUTE_STYLES,
   STOP_KINDS,
+  TRIP_TYPES,
   type PlaceGroupOption,
   type PlaceRef,
   type PlannerDraft,
@@ -84,11 +86,29 @@ export function StepWhere({
           }
         />
       </div>
+      <StepGroup title="ไป-กลับ หรือไปอย่างเดียว">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="รูปแบบการเดินทาง">
+          {TRIP_TYPES.map((t) => (
+            <Chip
+              key={t.key}
+              pressed={(draft.tripType ?? "round") === t.key}
+              tone="accent"
+              onClick={() => patch({ tripType: t.key })}
+            >
+              {t.label}
+            </Chip>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs text-subtle">
+          {TRIP_TYPES.find((t) => t.key === (draft.tripType ?? "round"))?.hint}
+        </p>
+      </StepGroup>
       <StepGroup title="วันเดินทาง">
         <DateRangeCalendar
           start={draft.startDate}
           end={draft.endDate}
           today={today}
+          endLabel={isOneWay(draft) ? "วันสุดท้ายของทริป" : "เดินทางกลับ"}
           onChange={({ startDate, endDate }) => patch({ startDate, endDate })}
         />
         {days > 14 && (
@@ -104,7 +124,8 @@ export function StepWhere({
 export function whereSummary(d: PlannerDraft) {
   if (!d.origin || !d.destination) return "ยังไม่ได้เลือกต้นทางและปลายทาง";
   const days = daysBetween(d.startDate, d.endDate);
-  return `${d.origin.label} → ${d.destination.label} · ${days} วัน`;
+  const type = isOneWay(d) ? "ไปอย่างเดียว" : "ไป-กลับ";
+  return `${d.origin.label} → ${d.destination.label} · ${type} · ${days} วัน`;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +267,9 @@ export function StepInterests({
           </p>
         )}
         {current && "error" in current && (
-          <Callout tone="danger" className="mb-3">{current.error}</Callout>
+          <Callout tone="danger" className="mb-3">
+            {current.error}
+          </Callout>
         )}
         {current && "groups" in current && (
           <div className="mb-3 rounded-lg bg-secondary-soft px-3 py-2 text-xs text-secondary">

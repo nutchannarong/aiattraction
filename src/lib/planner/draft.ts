@@ -15,6 +15,7 @@ export function defaultDraft(today = new Date()): PlannerDraft {
     version: 1,
     origin: null,
     destination: null,
+    tripType: "round",
     startDate: isoDate(start),
     endDate: isoDate(end),
     travelers: { adults: 2, children: 0, seniors: 0, adultAges: [] },

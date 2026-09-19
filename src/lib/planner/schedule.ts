@@ -465,8 +465,8 @@ export function buildSchedule(input: ScheduleInput): DayPlan[] {
       day.items[0].warning = `ขับรวมประมาณ ${Math.round(outDrive / 60)} ชม. นานเกินไปสำหรับจำนวนวันนี้ ลองเพิ่มวันเดินทาง`;
     }
 
-    // Overnight (unless the whole trip is a single day).
-    if (days.length > 1) {
+    // Overnight, unless this is the trip's last day.
+    if (dayIdx < days.length - 1) {
       const at = pointAtFraction(outbound.coordinates, Math.min(1, endFraction));
       const dinnerShop = takePoi(ctx, ["restaurant"], at);
       day.items.push(mealItem("อาหารเย็น", Math.max(t.clock, 18 * 60), dinnerShop, draft));
@@ -518,9 +518,12 @@ export function buildSchedule(input: ScheduleInput): DayPlan[] {
     const dinnerShop = nearestPoi(allPois, ["restaurant"], dest, usedPoi);
     if (dinnerShop) usedPoi.add(dinnerShop.id);
     day.items.push(mealItem("อาหารเย็น", Math.max(clock, 18 * 60), dinnerShop, draft));
-    const stay = nearestPoi(allPois, lodgingKinds, dest, usedPoi);
-    if (stay) usedPoi.add(stay.id);
-    day.items.push(lodgingItem(stay, Math.max(clock, 18 * 60) + 60, draft));
+    // The last day of a one-way trip ends at the destination: no night to book.
+    if (day.index < days.length - 1) {
+      const stay = nearestPoi(allPois, lodgingKinds, dest, usedPoi);
+      if (stay) usedPoi.add(stay.id);
+      day.items.push(lodgingItem(stay, Math.max(clock, 18 * 60) + 60, draft));
+    }
     pool = pool.filter((c) => !used.has(c.attId));
   }
 

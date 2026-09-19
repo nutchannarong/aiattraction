@@ -305,6 +305,7 @@ export async function saveTrip(draft: PlannerDraft, plan: TripPlan): Promise<Sav
     },
     route_style: draft.routeStyle,
     route_summary: {
+      trip_type: draft.tripType ?? "round",
       distance_km: Math.round(plan.totals.distanceKm),
       drive_minutes: Math.round(plan.totals.driveMin),
       fuel_units: Math.round(plan.totals.fuelUnits * 10) / 10,
