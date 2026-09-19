@@ -54,6 +54,34 @@ export function bookingLinks(q: StayQuery): Record<BookingPlatform, string> {
     nflt: hasPrice ? `price=THB-${minPrice ?? 0}-${maxPrice ?? "max"}-1` : null,
   })}`;
 
+  const trip = `https://th.trip.com/hotels/list?${qs({
+    searchWord: text,
+    checkin: q.checkIn.replaceAll("-", ""),
+    checkout: q.checkOut.replaceAll("-", ""),
+    adult: q.adults,
+    child: q.children || null,
+    crn: rooms,
+    curr: "THB",
+  })}`;
+
+  const traveloka = `https://www.traveloka.com/th-th/hotel/search?${qs({
+    q: text,
+    checkIn: q.checkIn,
+    checkOut: q.checkOut,
+    rooms,
+    adults: q.adults,
+    children: q.children || null,
+  })}`;
+
+  const expedia = `https://www.expedia.co.th/Hotel-Search?${qs({
+    destination: text,
+    startDate: q.checkIn,
+    endDate: q.checkOut,
+    rooms,
+    adults: q.adults,
+    children: q.children || null,
+  })}`;
+
   const airbnb = `https://www.airbnb.co.th/s/${encodeURIComponent(q.area || q.name)}/homes?${qs({
     query: text,
     checkin: q.checkIn,
@@ -71,7 +99,7 @@ export function bookingLinks(q: StayQuery): Record<BookingPlatform, string> {
       ? `tel:${q.phone.split(/[,;/]/)[0].replace(/[^\d+]/g, "")}`
       : `https://www.google.com/search?${qs({ q: `${text} จองตรง` })}`);
 
-  return { agoda, booking, airbnb, direct };
+  return { agoda, booking, trip, traveloka, expedia, airbnb, direct };
 }
 
 /** Number of nights between two ISO dates. */

@@ -28,11 +28,24 @@ export const LODGING_TYPES: { key: LodgingType; label: string; osmKinds: string[
   },
 ];
 
-export type BookingPlatform = "agoda" | "booking" | "airbnb" | "direct";
+export const BOOKING_PLATFORMS = [
+  "agoda",
+  "booking",
+  "trip",
+  "traveloka",
+  "expedia",
+  "airbnb",
+  "direct",
+] as const;
+
+export type BookingPlatform = (typeof BOOKING_PLATFORMS)[number];
 
 export const PLATFORM_LABEL: Record<BookingPlatform, string> = {
   agoda: "Agoda",
   booking: "Booking.com",
+  trip: "Trip.com",
+  traveloka: "Traveloka",
+  expedia: "Expedia",
   airbnb: "Airbnb",
   direct: "จองตรงกับที่พัก",
 };
@@ -70,6 +83,8 @@ export type LodgingDetail = {
   filters: string[];
   /** Price per night the user found on each platform (entered by the user). */
   prices: Partial<Record<BookingPlatform, number>>;
+  /** When the user last copied each price from the external booking site. */
+  priceCheckedAt?: Partial<Record<BookingPlatform, string>>;
   platform: BookingPlatform | null;
   website: string | null;
   stars: number | null;

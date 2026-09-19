@@ -141,7 +141,7 @@ export function NearbyPicker({
       <ul className="space-y-2">
         {items.map((p) => {
           const warn = closedWarning(p.openingHours, date);
-          const [maps] = lookupLinks(p.place.name, p.place.area);
+          const [maps] = lookupLinks(p.place.name, p.place.area, p.place.category);
           return (
             <li
               key={`${p.place.source}:${p.place.id}`}
@@ -171,6 +171,11 @@ export function NearbyPicker({
                   <p className="text-xs text-subtle">เวลาเปิด: {p.openingHours}</p>
                 )}
                 {p.phone && <p className="text-xs text-subtle">โทร {p.phone}</p>}
+                {category === "lodging" && (
+                  <p className="text-xs font-semibold text-accent">
+                    ราคา: ยังไม่ได้ตรวจสอบ · เลือกแล้วเปิดเทียบเว็บจองได้
+                  </p>
+                )}
                 {warn && <p className="text-xs font-semibold text-danger">{warn}</p>}
               </div>
               <div className="flex flex-none flex-col items-end gap-1.5">

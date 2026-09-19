@@ -85,7 +85,7 @@ export function ItemRow({ item, actions }: { item: PlanItem; actions?: ReactNode
         )}
         {item.place && !isDrive && item.place.source !== "pin" && (
           <p className="mt-0.5 flex flex-wrap gap-x-2.5 text-xs">
-            {lookupLinks(item.place.name, item.place.area).map((l) => (
+            {lookupLinks(item.place.name, item.place.area, item.place.category).map((l) => (
               <a
                 key={l.label}
                 href={l.href}

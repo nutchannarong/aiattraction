@@ -234,6 +234,7 @@ function lodgingItem(poi: RoutePoi | null, start: number, d: PlannerDraft): Plan
       maxPrice: null,
       filters: ["parking"],
       prices: {},
+      priceCheckedAt: {},
       platform: null,
       website: null,
       stars: poi?.stars ?? null,

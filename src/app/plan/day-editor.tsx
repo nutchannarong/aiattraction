@@ -5,12 +5,15 @@ import {
   ArrowUp,
   BedDouble,
   CheckCircle2,
+  ChevronDown,
   Coffee,
+  Map,
   Pencil,
   Plus,
   Shuffle,
   Trash2,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass, Modal } from "@/components/ui/modal";
@@ -38,6 +41,11 @@ import { DayCostTotal, formatThaiDate, ItemRow } from "./day-plan";
 import { ItemForm } from "./item-form";
 import { LodgingPicker } from "./lodging-picker";
 import { NearbyPicker, type NearbyPoint } from "./nearby-picker";
+
+const DailyPlanMap = dynamic(() => import("@/components/daily-plan-map"), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse bg-surface-2 motion-reduce:animate-none sm:h-72" />,
+});
 
 export type AddRequest = { key: number; item: PlanItem; dayIndex: number };
 
@@ -100,6 +108,7 @@ export function DayEditor({
 }) {
   const [local, setLocal] = useState<ModalState | null>(null);
   const [restAfter, setRestAfter] = useState<number | null>(null);
+  const [openMaps, setOpenMaps] = useState<Set<number>>(() => new Set([0]));
   const modal: ModalState | null = addRequest
     ? {
         type: "item",
@@ -131,6 +140,20 @@ export function DayEditor({
     <div className="space-y-5">
       {plan.days.map((sourceDay) => {
         const day = orderDayItems(sourceDay);
+        const previousDay = plan.days.find((candidate) => candidate.index === day.index - 1);
+        const previousPlace = previousDay
+          ? orderDayItems(previousDay).items.toReversed().find((item) => item.place)?.place ?? null
+          : null;
+        const mapStart =
+          day.index === 0 && draft.origin
+            ? {
+                source: "place" as const,
+                name: draft.origin.label,
+                latitude: draft.origin.latitude,
+                longitude: draft.origin.longitude,
+              }
+            : previousPlace;
+        const mapOpen = openMaps.has(day.index);
         const hasLodging = day.items.some((i) => i.kind === "lodging");
         const needsLodging = day.index < plan.days.length - 1 && !hasLodging;
         return (
@@ -152,6 +175,33 @@ export function DayEditor({
               )}
               <DayCostTotal day={day} />
             </header>
+
+            <div className="border-b-[1.5px] border-border">
+              <button
+                type="button"
+                aria-expanded={mapOpen}
+                className="flex w-full items-center gap-2 bg-surface-3 px-4 py-2.5 text-left text-sm font-semibold hover:bg-surface-2"
+                onClick={() =>
+                  setOpenMaps((current) => {
+                    const next = new Set(current);
+                    if (next.has(day.index)) next.delete(day.index);
+                    else next.add(day.index);
+                    return next;
+                  })
+                }
+              >
+                <Map className="size-4 text-secondary" aria-hidden="true" />
+                แผนที่ตามแผนของวันที่ {day.index + 1}
+                <span className="ml-auto text-xs font-normal text-subtle">
+                  แสดงเฉพาะจุดในวันนี้
+                </span>
+                <ChevronDown
+                  className={`size-4 transition-transform ${mapOpen ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                />
+              </button>
+              {mapOpen && <DailyPlanMap day={day} start={mapStart} />}
+            </div>
 
             {!day.finished && (
               <div className="flex flex-wrap items-center gap-2 border-b-[1.5px] border-dashed border-border bg-surface-3 px-4 py-2.5">

@@ -96,11 +96,13 @@ function ClickToAdd({ onAdd }: { onAdd: (p: LatLng) => void }) {
 function PopupLinks({
   name,
   area,
+  kind,
   lat,
   lng,
 }: {
   name: string;
   area?: string | null;
+  kind?: string | null;
   lat: number;
   lng: number;
 }) {
@@ -114,7 +116,7 @@ function PopupLinks({
       >
         นำทาง
       </a>
-      {lookupLinks(name, area).map((l) => (
+      {lookupLinks(name, area, kind).map((l) => (
         <a
           key={l.label}
           href={l.href}
@@ -184,6 +186,7 @@ export default function TripMap({
               <PopupLinks
                 name={p.name ?? p.brand ?? ""}
                 area={p.address}
+                kind={p.kind}
                 lat={p.latitude}
                 lng={p.longitude}
               />
@@ -216,6 +219,7 @@ export default function TripMap({
               <PopupLinks
                 name={s.place.name}
                 area={s.place.area}
+                kind={s.place.category}
                 lat={s.place.latitude}
                 lng={s.place.longitude}
               />

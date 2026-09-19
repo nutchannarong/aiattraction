@@ -405,13 +405,25 @@ export function StepStops({ draft, patch }: StepProps) {
           ))}
         </div>
       </StepGroup>
+      {draft.stopKinds.includes("lodging") && (
+        <Callout tone="info" className="mt-3" title="เปิดการเลือกที่พักและเทียบราคาแล้ว">
+          <p>
+            เมื่อสร้างร่างแผน แต่ละคืนจะมีปุ่ม “เลือกที่พัก” ให้ดูรายชื่อจาก OpenStreetMap
+            แล้วเปิดเว็บจองเพื่อกรอกราคาที่ตรวจสอบได้
+          </p>
+          <p className="mt-1 font-semibold">
+            Agoda · Booking.com · Trip.com · Traveloka · Expedia · Airbnb · จองตรง
+          </p>
+        </Callout>
+      )}
       <Callout
         tone="info"
         className="mt-3"
         title="ข้อมูลร้าน ที่พัก และจุดบริการมาจาก OpenStreetMap"
       >
         ข้อมูลเปิด แก้ไขโดยอาสาสมัคร บางร้านอาจยังไม่มีในแผนที่ หรือเวลาเปิด-ปิดไม่ครบ
-        ระบบไม่แต่งข้อมูลขึ้นมาเอง แต่มีปุ่มค้นหาต่อใน Google Maps, Wongnai และ Lemon8 ให้
+        ระบบไม่แต่งข้อมูลขึ้นมาเอง ทุกสถานที่ค้นหาต่อใน Google Maps ได้
+        ส่วนร้านอาหารและคาเฟ่ค้นหาต่อใน LINE MAN Wongnai ได้
       </Callout>
     </>
   );

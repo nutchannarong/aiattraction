@@ -49,7 +49,7 @@ export const POI_CATEGORIES: PoiCategory[] = [
   },
   {
     key: "other",
-    label: "อื่น ๆ (จุดพักรถ ห้องน้ำ ที่จอด)",
+    label: "จุดพักรถ · ห้องน้ำ · ที่จอดรถ",
     color: "#6B7078",
     icon: MapPin,
     kinds: ["rest_area", "services", "toilets", "parking"],
@@ -63,23 +63,21 @@ export function poiCategoryOf(kind: string): PoiCategory {
 }
 
 /** Links to look a place up elsewhere (we don't copy reviews; we send people to the source). */
-export function lookupLinks(name: string, area?: string | null) {
+export function lookupLinks(name: string, area?: string | null, kind?: string | null) {
   const q = [name, area].filter(Boolean).join(" ");
-  return [
+  const links = [
     {
       label: "Google Maps",
       href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
     },
-    // Site-restricted web searches: stable URLs, and they land on the review pages themselves.
-    {
-      label: "Wongnai",
-      href: `https://www.google.com/search?q=${encodeURIComponent(`site:wongnai.com ${q}`)}`,
-    },
-    {
-      label: "Lemon8",
-      href: `https://www.google.com/search?q=${encodeURIComponent(`site:lemon8-app.com ${q}`)}`,
-    },
   ];
+  if (kind === "restaurant" || kind === "cafe") {
+    links.push({
+      label: "LINE MAN Wongnai",
+      href: `https://www.google.com/search?q=${encodeURIComponent(`site:wongnai.com ${q}`)}`,
+    });
+  }
+  return links;
 }
 
 export function directionsLink(lat: number, lng: number) {

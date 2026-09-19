@@ -9,6 +9,7 @@ import { Field, inputClass, Modal } from "@/components/ui/modal";
 import { bookingLinks, nextDate, roomsFor } from "@/lib/planner/booking-links";
 import type { NearbyPlace } from "@/lib/planner/nearby";
 import {
+  BOOKING_PLATFORMS,
   LODGING_FILTERS,
   LODGING_TYPES,
   PLATFORM_LABEL,
@@ -25,14 +26,13 @@ import { formatThaiDate } from "./day-plan";
 import { NearbyPicker, type NearbyPoint } from "./nearby-picker";
 import { PlacePicker } from "./place-picker";
 
-const PLATFORMS: BookingPlatform[] = ["agoda", "booking", "airbnb", "direct"];
-
 const EMPTY_LODGING: LodgingDetail = {
   type: "hotel",
   minPrice: null,
   maxPrice: null,
   filters: ["parking"],
   prices: {},
+  priceCheckedAt: {},
   platform: null,
   website: null,
   stars: null,
@@ -67,6 +67,7 @@ export function LodgingPicker({
   const [phone, setPhone] = useState<string | null>(initial?.phone ?? null);
   const [minStars, setMinStars] = useState<number | null>(null);
   const [mode, setMode] = useState<"nearby" | "search">("nearby");
+  const [openedPlatform, setOpenedPlatform] = useState<BookingPlatform | null>(null);
   const set = (patch: Partial<LodgingDetail>) => setLodging((l) => ({ ...l, ...patch }));
 
   const { adults, children, seniors } = draft.travelers;
@@ -106,6 +107,7 @@ export function LodgingPicker({
     : null;
 
   const prices = Object.values(lodging.prices).filter((n): n is number => n != null && n > 0);
+  const cheapest = prices.length ? Math.min(...prices) : null;
   const chosenPrice = lodging.platform ? lodging.prices[lodging.platform] : undefined;
   const estimate =
     chosenPrice ?? (prices.length ? Math.min(...prices) : (initial?.costEstimate ?? null));
@@ -259,63 +261,100 @@ export function LodgingPicker({
               <p className="font-bold">ช่องทางจองและราคา</p>
               <p className="text-xs text-subtle">
                 เปิดแต่ละเว็บ (ใส่ชื่อ วันที่ และจำนวนคนไว้ให้แล้ว)
-                แล้วกรอกราคาต่อคืนที่เห็นเพื่อเปรียบเทียบ เราไม่มีราคาสดจากเว็บจองเหล่านี้
+                แล้วกรอกราคารวมทุกห้องต่อคืนที่เห็นเพื่อเปรียบเทียบ
+                เราไม่มีราคาสดจากเว็บจองเหล่านี้
               </p>
             </div>
             <ul className="space-y-2">
-              {PLATFORMS.map((p) => (
-                <li
-                  key={p}
-                  className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-2 rounded-xl border-[1.5px] border-border p-2.5 sm:grid-cols-[9rem_minmax(0,1fr)_7.5rem]"
-                >
-                  <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-semibold">
-                    <input
-                      type="radio"
-                      name="platform"
-                      className="size-4 accent-accent"
-                      checked={lodging.platform === p}
-                      onChange={() => set({ platform: p })}
-                    />
-                    {PLATFORM_LABEL[p]}
-                  </label>
-                  <a
-                    href={links![p]}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="col-span-2 inline-flex min-h-10 items-center gap-1 text-xs font-semibold text-info underline sm:col-span-1"
+              {BOOKING_PLATFORMS.map((p) => {
+                const platformPrice = lodging.prices[p];
+                const isCheapest =
+                  platformPrice != null && platformPrice > 0 && platformPrice === cheapest;
+                const checkedAt = lodging.priceCheckedAt?.[p];
+                return (
+                  <li
+                    key={p}
+                    className={`grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-2 rounded-xl border-[1.5px] p-2.5 sm:grid-cols-[9rem_minmax(0,1fr)_7.5rem] ${
+                      isCheapest ? "border-secondary bg-secondary-soft" : "border-border"
+                    }`}
                   >
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                    {p === "direct"
-                      ? lodging.website
-                        ? "เว็บไซต์ที่พัก"
-                        : phone
-                          ? "โทรจอง"
-                          : "ค้นหาช่องทางจองตรง"
-                      : `ค้นหาใน ${PLATFORM_LABEL[p]}`}
-                  </a>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    aria-label={`ราคาต่อคืนใน ${PLATFORM_LABEL[p]}`}
-                    placeholder="บาท/คืน"
-                    className={`${inputClass} col-start-2 row-start-1 sm:col-start-3`}
-                    value={lodging.prices[p] ?? ""}
-                    onChange={(e) =>
-                      set({
-                        prices: {
-                          ...lodging.prices,
-                          [p]: numberOrNull(e.target.value) ?? undefined,
-                        },
-                      })
-                    }
-                  />
-                </li>
-              ))}
+                    <div>
+                      <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm font-semibold">
+                        <input
+                          type="radio"
+                          name="platform"
+                          className="size-4 accent-accent"
+                          checked={lodging.platform === p}
+                          onChange={() => set({ platform: p })}
+                        />
+                        {PLATFORM_LABEL[p]}
+                        {isCheapest && <Badge tone="secondary">ถูกสุด</Badge>}
+                      </label>
+                      <p className="text-[11px] text-subtle">
+                        {platformPrice == null
+                          ? "ยังไม่ได้ตรวจสอบ"
+                          : checkedAt
+                            ? `ตรวจเมื่อ ${new Date(checkedAt).toLocaleString("th-TH", {
+                                dateStyle: "short",
+                                timeStyle: "short",
+                              })}`
+                            : "ราคาที่กรอกไว้"}
+                      </p>
+                    </div>
+                    <a
+                      href={links![p]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="col-span-2 inline-flex min-h-10 items-center gap-1 text-xs font-semibold text-info underline sm:col-span-1"
+                      onClick={() => {
+                        set({ platform: p });
+                        setOpenedPlatform(p);
+                      }}
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      {p === "direct"
+                        ? lodging.website
+                          ? "เว็บไซต์ที่พัก"
+                          : phone
+                            ? "โทรจอง"
+                            : "ค้นหาช่องทางจองตรง"
+                        : `ค้นหาใน ${PLATFORM_LABEL[p]}`}
+                    </a>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      aria-label={`ราคารวมทุกห้องต่อคืนใน ${PLATFORM_LABEL[p]}`}
+                      placeholder="รวม/คืน"
+                      className={`${inputClass} col-start-2 row-start-1 sm:col-start-3`}
+                      value={lodging.prices[p] ?? ""}
+                      onChange={(e) => {
+                        const value = numberOrNull(e.target.value);
+                        set({
+                          prices: {
+                            ...lodging.prices,
+                            [p]: value ?? undefined,
+                          },
+                          priceCheckedAt: {
+                            ...lodging.priceCheckedAt,
+                            [p]: value == null ? undefined : new Date().toISOString(),
+                          },
+                          platform: value != null && lodging.platform == null ? p : lodging.platform,
+                        });
+                      }}
+                    />
+                    {openedPlatform === p && platformPrice == null && (
+                      <p className="col-span-2 text-xs font-semibold text-accent sm:col-span-3">
+                        กลับมาจาก {PLATFORM_LABEL[p]} แล้วกรอกราคารวมที่เห็นในช่องด้านขวา
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             {prices.length > 1 && (
               <p className="text-xs text-secondary">
-                ถูกสุด {Math.min(...prices).toLocaleString("th-TH")} บาท/คืน
+                ถูกสุด {cheapest!.toLocaleString("th-TH")} บาท/คืน · จากราคาที่คุณตรวจสอบเอง
               </p>
             )}
             {estimate != null && (

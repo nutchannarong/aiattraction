@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { bookingLinks, nextDate } from "@/lib/planner/booking-links";
 import { replaceItem, updateDay } from "@/lib/planner/edit";
 import {
+  BOOKING_PLATFORMS,
   BOOKING_STATUS_LABEL,
   PLATFORM_LABEL,
   type BookingPlatform,
@@ -20,8 +21,6 @@ import {
 } from "@/lib/planner/plan-types";
 import type { PlannerDraft } from "@/lib/planner/types";
 import { baht, formatThaiDate } from "./day-plan";
-
-const PLATFORMS: BookingPlatform[] = ["agoda", "booking", "airbnb", "direct"];
 
 type Night = { n: number; day: DayPlan; item: PlanItem | null };
 
@@ -235,7 +234,7 @@ export function BookingChecklist({
                     role="group"
                     aria-label={`ช่องทางจองคืนที่ ${night.n}`}
                   >
-                    {PLATFORMS.map((p) => (
+                    {BOOKING_PLATFORMS.map((p) => (
                       <Chip
                         key={p}
                         pressed={lodging?.platform === p}
