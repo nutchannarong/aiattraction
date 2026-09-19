@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AttractionMap, hasValidCoordinates } from "@/components/attraction-map";
+import { RoadsideCard, RoadsideCardSkeleton } from "@/components/roadside-card";
 import { WeatherCard, WeatherCardSkeleton } from "@/components/weather-card";
 import { CATEGORIES, getAttraction, htmlToText, toExternalUrl } from "@/lib/attractions";
 
@@ -97,6 +98,11 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
           {hasMap && (
             <Suspense fallback={<WeatherCardSkeleton />}>
               <WeatherCard latitude={a.latitude!} longitude={a.longitude!} />
+            </Suspense>
+          )}
+          {hasMap && (
+            <Suspense fallback={<RoadsideCardSkeleton />}>
+              <RoadsideCard latitude={a.latitude!} longitude={a.longitude!} />
             </Suspense>
           )}
           <div className="space-y-6 rounded-xl border border-border bg-surface p-5">
