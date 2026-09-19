@@ -77,7 +77,7 @@ export async function WeatherCard({ latitude, longitude }: Props) {
               {round(day.max)}° / {round(day.min)}°
             </p>
             {day.rainChance != null && (
-              <p className="tabular-nums text-accent">ฝน {day.rainChance}%</p>
+              <p className="tabular-nums text-secondary">ฝน {day.rainChance}%</p>
             )}
           </li>
         ))}

@@ -118,7 +118,7 @@ export function NearbyList() {
                 className="flex h-full flex-col gap-2 rounded-xl border border-border bg-surface p-4 transition hover:border-accent"
               >
                 <span className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-accent">{a.att_type_label}</span>
+                  <span className="text-secondary">{a.att_type_label}</span>
                   <span className="shrink-0 font-medium tabular-nums">
                     {formatDistance(a.distance_m)}
                   </span>

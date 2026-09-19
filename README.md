@@ -1,6 +1,10 @@
-# aiattraction
+<p align="center"><img src="public/logo.webp" alt="ไทยไหนดี" width="220"></p>
 
-Ai Attraction — ค้นหาแหล่งท่องเที่ยวทั่วประเทศไทย (Next.js 16 + Supabase, deploy บน Vercel)
+# ไทยไหนดี (aiattraction)
+
+ไทยไหนดี — ค้นหาแหล่งท่องเที่ยวทั่วประเทศไทย พร้อมแผนที่ สภาพอากาศ ปั๊มน้ำมันและจุดแวะพักรถใกล้เคียง (Next.js 16 + Supabase, deploy บน Vercel)
+
+โลโก้ต้นฉบับอยู่ที่ `brand/logo-source.webp` ถ้าเปลี่ยนโลโก้ ให้รัน `node scripts/generate-brand-assets.mjs` เพื่อสร้าง favicon, ไอคอนแอป, ภาพแชร์ลิงก์ (OG image) และโลโก้บนเว็บใหม่
 
 ## สถาปัตยกรรมระบบ (System Architecture)` ต่อจากย่อหน้าแนะนำโปรเจกต์ (ก่อน "เริ่มต้นใช้งาน") เนื้อหาเดิมไม่แตะ แผนภาพใช้ Mermaid ซึ่ง GitHub แสดงผลให้อัตโนมัติ
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { GoogleIcon } from "@/components/google-icon";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -22,7 +23,15 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <div className="mx-auto max-w-sm space-y-6 py-8">
-      <div className="space-y-1">
+      <Image
+        src="/logo.webp"
+        alt="ไทยไหนดี"
+        width={160}
+        height={160}
+        priority
+        className="mx-auto"
+      />
+      <div className="space-y-1 text-center">
         <h1 className="text-2xl font-bold">เข้าสู่ระบบ</h1>
         <p className="text-sm text-muted">เข้าสู่ระบบด้วยบัญชี Google หรืออีเมล</p>
       </div>

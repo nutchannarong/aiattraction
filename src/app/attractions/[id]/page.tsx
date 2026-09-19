@@ -85,7 +85,7 @@ export default async function AttractionPage({ params }: PageProps<"/attractions
       </Link>
 
       <header className="space-y-2">
-        <p className="text-sm text-accent">
+        <p className="text-sm text-secondary">
           {[a.att_category && CATEGORIES[a.att_category], a.att_type_label]
             .filter(Boolean)
             .join(" · ")}

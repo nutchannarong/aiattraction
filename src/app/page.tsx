@@ -131,7 +131,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 href={`/attractions/${a.att_id}`}
                 className="flex h-full flex-col gap-2 rounded-xl border border-border bg-surface p-4 transition hover:border-accent"
               >
-                <span className="text-xs text-accent">{a.att_type_label}</span>
+                <span className="text-xs text-secondary">{a.att_type_label}</span>
                 <span className="font-semibold leading-snug">{a.att_name_th}</span>
                 {a.att_name_en && (
                   <span className="text-sm text-muted">{a.att_name_en}</span>

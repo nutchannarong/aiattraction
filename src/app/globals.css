@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f7f5;
+  /* Brand: orange + turquoise from the ไทยไหนดี logo, darkened where needed for 4.5:1 text contrast. */
+  --background: #faf7f2;
   --surface: #ffffff;
   --foreground: #1c1c1a;
-  --muted: #6b6b66;
-  --border: #e4e4df;
-  --accent: #0f766e;
+  --muted: #6b6660;
+  --border: #ebe5dc;
+  --accent: #c8431a;
+  --secondary: #0f766e;
   --danger: #b91c1c;
   --danger-soft: #fef2f2;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121211;
-    --surface: #1c1c1a;
-    --foreground: #ededea;
-    --muted: #a3a39e;
-    --border: #2e2e2b;
-    --accent: #2dd4bf;
+    --background: #141211;
+    --surface: #1e1b19;
+    --foreground: #eeeae6;
+    --muted: #a8a29e;
+    --border: #33302c;
+    --accent: #ff8a65;
+    --secondary: #2dd4bf;
     --danger: #fca5a5;
     --danger-soft: #450a0a;
   }
@@ -31,6 +34,7 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-secondary: var(--secondary);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
