@@ -5,6 +5,9 @@ import OpenAI from "openai";
 /** Model id on OpenRouter; override with OPENROUTER_MODEL without a code change. */
 export const AI_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.8-flash";
 
+/** OpenAI model (via OpenRouter) that writes the per-route advice on the plan options. */
+export const ROUTE_ADVICE_MODEL = process.env.OPENROUTER_ROUTE_MODEL || "openai/gpt-5.4-mini";
+
 /**
  * OpenRouter's reasoning control (not part of the OpenAI types). Gemini 3.x can't turn
  * reasoning off; "low" keeps replies fast and cheap while still choosing tools sensibly.

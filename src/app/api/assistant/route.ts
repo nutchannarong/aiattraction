@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import { findNearby } from "@/app/plan/editor-actions";
 import { AI_MODEL, AI_REASONING, getAi, isAiConfigured } from "@/lib/ai";
+import { rateLimited } from "@/lib/assistant/rate-limit";
 import { distanceMeters } from "@/lib/geo";
 import { getPlaceGroups } from "@/lib/place-groups";
 import { searchPlaces } from "@/lib/places";
@@ -39,20 +40,6 @@ const bodySchema = z.object({
 
 type Body = z.infer<typeof bodySchema>;
 type Stop = Body["context"]["stops"][number];
-
-// Best-effort per-instance limit so one visitor can't run up the OpenRouter bill.
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 30;
-const hits = new Map<string, number[]>();
-
-function rateLimited(ip: string) {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  hits.set(ip, recent);
-  if (hits.size > 5000) hits.clear();
-  return recent.length > MAX_PER_WINDOW;
-}
 
 const CATEGORY_KEYS = NEARBY_CATEGORIES.map((c) => c.key).filter((k) => k !== "same");
 
@@ -260,8 +247,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (rateLimited(ip)) {
+  if (rateLimited(request)) {
     return Response.json({ error: "ถามถี่เกินไป พักสักครู่แล้วลองใหม่นะ" }, { status: 429 });
   }
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));

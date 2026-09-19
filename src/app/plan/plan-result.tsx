@@ -47,6 +47,7 @@ import { BookingChecklist } from "./booking-checklist";
 import { CostSummary } from "./cost-summary";
 import { baht } from "./day-plan";
 import { DayEditor, type AddRequest } from "./day-editor";
+import { buildAssistantContext } from "@/lib/assistant/context";
 import { saveTrip } from "./editor-actions";
 import { PlanOptions } from "./plan-options";
 import type { FailedOption, PlanOption } from "./use-saved-plan";
@@ -196,6 +197,11 @@ export function PlanResult({
   const [snapRoad, setSnapRoad] = useState(true);
   const [snapMessage, setSnapMessage] = useState<string | null>(null);
 
+  // The planner answers as text (no plan detail), for the AI route advice.
+  const tripSummary = useMemo(
+    () => buildAssistantContext(draft, null, groups).summary.replace(/\n\nยังไม่ได้กดร่างแผน$/, ""),
+    [draft, groups],
+  );
   const groupColors = useMemo(
     () => Object.fromEntries(groups.map((g) => [g.key, g.color])),
     [groups],
@@ -267,10 +273,13 @@ export function PlanResult({
 
       {onChoose && options.length + failed.length > 1 && (
         <PlanOptions
+          // A new drafting run starts with fresh AI advice.
+          key={options.map((o) => `${o.style}:${Math.round(o.plan.totals.distanceKm)}`).join("|")}
           options={options}
           failed={failed}
           chosen={draft.routeStyle}
           currentPlan={plan}
+          tripSummary={tripSummary}
           onChoose={onChoose}
         />
       )}
