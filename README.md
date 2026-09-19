@@ -14,8 +14,8 @@ npm run dev                  # http://localhost:3000
 
 | ชื่อ | ที่มา |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → Publishable key (`sb_publishable_...`) |
+| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+| `SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API Keys → Publishable key (`sb_publishable_...`) |
 
 ## ฐานข้อมูล
 
@@ -26,6 +26,6 @@ SQL ที่แอปต้องใช้ (สิทธิ์อ่านแ�
 
 1. Push repo นี้ขึ้น GitHub
 2. ไปที่ https://vercel.com/new → Import `aiattraction` (Vercel ตรวจเจอ Next.js ให้อัตโนมัติ)
-3. ใส่ Environment Variables ทั้งสองตัวด้านบน → Deploy
+3. ใส่ Environment Variables ทั้งสองตัวด้านบน (ถ้าเชื่อม Supabase Integration ใน Vercel ไว้ จะมีให้อัตโนมัติ) → Deploy
 
 หลังจากนั้นทุกครั้งที่ push ไป `main` Vercel จะ deploy ให้อัตโนมัติ

@@ -2,15 +2,28 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | undefined;
 
+// Only server components query Supabase, so server-only names are preferred.
+// These match what the Vercel Supabase integration sets; NEXT_PUBLIC_* is a fallback.
+function readEnv() {
+  const env = process.env;
+  return {
+    url: env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL,
+    key:
+      env.SUPABASE_PUBLISHABLE_KEY ??
+      env.SUPABASE_ANON_KEY ??
+      env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+}
+
 // Created on first use so `next build` doesn't need the env vars to be present.
 export function getSupabase() {
   if (client) return client;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url, key } = readEnv();
   if (!url || !key) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Set them in .env.local (local) or in Vercel → Settings → Environment Variables.",
+      "Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY. Set them in .env.local (local) or in Vercel → Settings → Environment Variables.",
     );
   }
 
