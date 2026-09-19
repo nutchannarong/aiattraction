@@ -31,7 +31,7 @@ export function DistanceFromMe({ target }: { target: Coordinates }) {
         {state.status === "locating" ? "กำลังระบุตำแหน่ง…" : "ดูระยะทางจากตำแหน่งของฉัน"}
       </button>
       {state.status === "error" && (
-        <p role="alert" className="text-xs text-red-700 dark:text-red-300">
+        <p role="alert" className="text-xs text-danger">
           {state.message}
         </p>
       )}

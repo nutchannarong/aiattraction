@@ -1,5 +1,8 @@
 // Client-safe geo helpers (no server imports).
 
+/** Search radius for "near me". */
+export const NEARBY_RADIUS_M = 200000;
+
 export type Coordinates = { latitude: number; longitude: number };
 
 /** Great-circle distance in meters. */

@@ -228,6 +228,16 @@
 - ข้อมูล rich text จากฐานข้อมูลห้ามนำไป render เป็น raw HTML โดยตรง เว้นแต่มีการ sanitize ที่เชื่อถือได้
 - ปัจจุบันให้ใช้ `htmlToText()` สำหรับแสดงเป็น plain text
 
+### 6.6 Authentication และตำแหน่งผู้ใช้
+
+- งานที่เกี่ยวกับผู้ใช้ (login, session, ข้อมูลของผู้ใช้) ใช้ `createAuthClient()` จาก `src/lib/supabase-server.ts` ซึ่งเป็นข้อยกเว้นของข้อ 6.1: `@supabase/ssr` ต้องสร้าง client ใหม่ทุก request เพราะผูกกับ cookie ของผู้ใช้คนนั้น
+- ข้อมูล public ยังใช้ `getSupabase()` ตามเดิม
+- ใช้ `getCurrentUser()` เพื่ออ่านผู้ใช้ปัจจุบัน (ตรวจ JWT ด้วย `getClaims()`) ห้ามเชื่อ `getSession()` บน server
+- การเข้าสู่ระบบ/สมัคร/ออกจากระบบทำผ่าน Server Action ใน `src/app/login/actions.ts` และ redirect ได้เฉพาะ path ภายในเว็บ (กัน open redirect)
+- `src/proxy.ts` ทำหน้าที่ต่ออายุ session อย่าเพิ่ม logic อื่นที่หนักลงไป
+- ตำแหน่งผู้ใช้ขอผ่าน `useGeolocation()` เมื่อผู้ใช้กดปุ่มเท่านั้น (หรือเมื่อเคยอนุญาตไว้แล้ว) ห้ามใส่พิกัดใน URL และห้ามบันทึกลงฐานข้อมูลโดยไม่แจ้งผู้ใช้
+- ถ้าต้องส่งพิกัดไป server ให้ปัดเศษก่อนและส่งผ่าน Server Action (POST body); ถ้าคำนวณใน browser ได้ เช่น ระยะทาง ให้ทำใน browser
+
 ## 7. Checklist ก่อนส่งงาน
 
 - ชื่อไฟล์และชื่อ Component เป็นไปตาม convention

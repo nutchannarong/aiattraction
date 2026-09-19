@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { NEARBY_RADIUS_M } from "./geo";
 import { getSupabase } from "./supabase";
 
 export const PAGE_SIZE = 24;
@@ -166,4 +167,32 @@ export function toExternalUrl(value: string | null) {
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+/.test(v)) return `https://${v}`;
   return null;
+}
+
+export type NearbyAttraction = Pick<
+  AttractionSummary,
+  | "att_id"
+  | "att_name_th"
+  | "att_name_en"
+  | "att_type_label"
+  | "province_name_th"
+  | "district_name_th"
+> & { distance_m: number };
+
+const NEARBY_LIMIT = 30;
+
+/** Nearest attractions to a point, closest first. */
+export async function getNearbyAttractions(
+  latitude: number,
+  longitude: number,
+): Promise<NearbyAttraction[]> {
+  const { data, error } = await getSupabase().rpc("nearby_attractions", {
+    lat: latitude,
+    lng: longitude,
+    max_results: NEARBY_LIMIT,
+    radius_m: NEARBY_RADIUS_M,
+  });
+  if (error) throw new Error(`Failed to load nearby attractions: ${error.message}`);
+  // .returns<T>() doesn't type-check on rpc() with an untyped client.
+  return (data ?? []) as NearbyAttraction[];
 }

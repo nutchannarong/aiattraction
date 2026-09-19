@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { isLocationGranted, useGeolocation } from "@/hooks/use-geolocation";
-import { formatDistance } from "@/lib/geo";
-import { findNearbyAttractions, type NearbyAttraction } from "./actions";
+import type { NearbyAttraction } from "@/lib/attractions";
+import { formatDistance, NEARBY_RADIUS_M } from "@/lib/geo";
+import { findNearbyAttractions } from "./actions";
 
 // ~100 m precision is enough for "near me" and avoids sending the exact position.
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -26,7 +27,7 @@ export function NearbyList() {
     startTransition(async () => {
       const result = await findNearbyAttractions(round3(coords.latitude), round3(coords.longitude));
       if ("error" in result) {
-        setError(result.error ?? null);
+        setError(result.error);
         setItems(null);
       } else {
         setError(null);
@@ -63,17 +64,19 @@ export function NearbyList() {
 
       <div aria-live="polite">
         {state.status === "error" && (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="text-sm text-danger">
             {state.message}
           </p>
         )}
         {error && (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
         {items && items.length === 0 && (
-          <p className="py-8 text-center text-muted">ไม่พบสถานที่ท่องเที่ยวในรัศมี 200 กม.</p>
+          <p className="py-8 text-center text-muted">
+            ไม่พบสถานที่ท่องเที่ยวในรัศมี {NEARBY_RADIUS_M / 1000} กม.
+          </p>
         )}
       </div>
 

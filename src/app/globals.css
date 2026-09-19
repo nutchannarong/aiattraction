@@ -7,6 +7,8 @@
   --muted: #6b6b66;
   --border: #e4e4df;
   --accent: #0f766e;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +19,8 @@
     --muted: #a3a39e;
     --border: #2e2e2b;
     --accent: #2dd4bf;
+    --danger: #fca5a5;
+    --danger-soft: #450a0a;
   }
 }
 
@@ -27,6 +31,8 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
 }
 
