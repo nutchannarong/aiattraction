@@ -1,6 +1,6 @@
 <p align="center"><img src="public/logo.webp" alt="ไทยไหนดี" width="220"></p>
 
-# ไทยไหนดี (aiattraction)
+# ไทยไหนดี (Thainhaidee)
 
 ไทยไหนดี — แพลตฟอร์มวางแผนท่องเที่ยวทั่วประเทศไทยแบบอัจฉริยะ (AI-assisted Travel Planner) ค้นหาแหล่งท่องเที่ยวและจุดแวะพักริมทาง คำนวณเส้นทางและค่าพลังงาน แนะนำที่พัก แผนที่นำทางสด พร้อมระบบรายงานสถิติหลังบ้าน (Next.js 16 + Supabase + PostGIS + OpenRouter AI, deploy บน Vercel)
 
@@ -266,10 +266,7 @@ npm run lint
 ## หน้าเข้าใช้งานสำหรับผู้ดูแลระบบ (Admin Dashboard)
 
 * **เข้าสู่ระบบ:** `/admin/login`
-* **ข้อมูลเริ่มต้น:**
-  * **ชื่อผู้ใช้:** `admin`
-  * **รหัสผ่าน:** `thainhaidee` (ตรวจสอบผ่าน Scrypt hash ใน [src/lib/admin/session.ts](src/lib/admin/session.ts))
-* **แดชบอร์ด:** `/admin` แสดงข้อมูลรายงานสถิติแบบ Real-time และปุ่มส่งออก CSV
+* **แดชบอร์ด:** `/admin` แสดงข้อมูลรายงานสถิติแบบ Real-time
 * รายละเอียดและข้อจำกัดเพิ่มเติมดูได้ที่ [docs/admin-dashboard.md](docs/admin-dashboard.md)
 
 ---
