@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin/session";
 import { adminLogout } from "./login/actions";
 import { ReportChart } from "./report-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AdminAiChat } from "./admin-ai-chat";
 
 const TABS = [{ id: "overview", label: "ภาพรวม" }, { id: "users", label: "ผู้ใช้" }, { id: "destinations", label: "ปลายทาง" }, { id: "timing", label: "ช่วงเวลาเดินทาง" }, { id: "patterns", label: "รูปแบบทริป" }, { id: "finance", label: "การเงิน" }, { id: "vehicles", label: "ยานพาหนะ" }, { id: "schema", label: "โครงสร้างข้อมูล" }];
 function Stats({ items }: { items: Dashboard["overview"] }) {
@@ -54,5 +55,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       ["route_summary.travel_purpose", "วันหยุด เทศกาล และโอกาสพิเศษ", "เริ่มเก็บจากแบบฟอร์มใหม่; แผนเก่าแสดงไม่ระบุ"],
       ["การออกเดินทางจริง", "จำนวนทริปสถานะ active / done", "ระบบเดิมยังไม่มีปุ่มเริ่มทริป จึงยังไม่เกิดสถานะนี้จากหน้าเว็บ"],
     ].map(row=><tr key={row[0]} className="border-b border-border-soft">{row.map((cell,i)=><td key={i} className="p-3 align-top leading-relaxed">{cell}</td>)}</tr>)}</tbody></table></div><p className="mt-5 text-xs text-subtle">รายงานแสดงเฉพาะข้อมูลรวม ไม่ส่งชื่อ อีเมล หรือรหัสผู้ใช้ไปใน CSV · session แอดมินหมดอายุใน 8 ชั่วโมง</p></section>}
+    <AdminAiChat range={range} />
   </div>;
 }
