@@ -1,11 +1,11 @@
 "use client";
 
 import L from "leaflet";
-import { ExternalLink } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { ExternalLink, Maximize2, Minimize2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
-import type { DayPlan, PlanPlace } from "@/lib/planner/plan-types";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import type { PlanPlace } from "@/lib/planner/plan-types";
 
 type Point = {
   key: string;
@@ -16,15 +16,30 @@ type Point = {
 };
 
 type Props = {
-  day: DayPlan;
+  day: {
+    index: number;
+    items: Array<{ id: string; start: string | null; place: PlanPlace | null }>;
+  };
   start: Pick<PlanPlace, "name" | "latitude" | "longitude"> | null;
+  /** Nearby alternatives shown while replacing a stop. */
+  alternatives?: Array<{ id: string; name: string; latitude: number; longitude: number }>;
+  onSelectAlternative?: (id: string) => void;
+  className?: string;
+  /** Live-trip state; omitted when editing a draft itinerary. */
+  activeItemId?: string | null;
+  completedItemIds?: string[];
+  currentPosition?: { latitude: number; longitude: number; accuracy: number } | null;
 };
 
 const iconCache = new Map<string, L.DivIcon>();
 
-function numberedIcon(index: number, isStart: boolean) {
+function numberedIcon(
+  index: number,
+  isStart: boolean,
+  tone: "route" | "alternative" | "completed" | "active" = "route",
+) {
   const text = isStart ? "A" : String(index);
-  const key = `${text}:${isStart}`;
+  const key = `${text}:${isStart}:${tone}`;
   let icon = iconCache.get(key);
   if (!icon) {
     icon = L.divIcon({
@@ -33,11 +48,21 @@ function numberedIcon(index: number, isStart: boolean) {
         <span
           className="map-pin"
           style={{
-            background: isStart ? "#0f766e" : "#f4622e",
+            background:
+              tone === "alternative"
+                ? "#2563eb"
+                : tone === "completed"
+                  ? "#6b7280"
+                  : tone === "active"
+                    ? "#f4622e"
+                    : isStart
+                      ? "#0f766e"
+                      : "#f4622e",
             width: 28,
             height: 28,
             fontSize: 11,
             fontWeight: 800,
+            boxShadow: tone === "active" ? "0 0 0 5px rgba(244, 98, 46, 0.28)" : undefined,
           }}
         >
           {text}
@@ -52,17 +77,21 @@ function numberedIcon(index: number, isStart: boolean) {
   return icon;
 }
 
-function FitPoints({ points }: { points: Point[] }) {
+function FitPoints({ points, fullscreen }: { points: Point[]; fullscreen: boolean }) {
   const map = useMap();
   useEffect(() => {
-    if (points.length === 1) map.setView([points[0].latitude, points[0].longitude], 13);
-    if (points.length > 1) {
-      map.fitBounds(
-        L.latLngBounds(points.map((p) => [p.latitude, p.longitude] as [number, number])),
-        { padding: [28, 28] },
-      );
-    }
-  }, [map, points]);
+    const timer = window.setTimeout(() => {
+      map.invalidateSize();
+      if (points.length === 1) map.setView([points[0].latitude, points[0].longitude], 13);
+      if (points.length > 1) {
+        map.fitBounds(
+          L.latLngBounds(points.map((p) => [p.latitude, p.longitude] as [number, number])),
+          { padding: fullscreen ? [60, 60] : [28, 28], maxZoom: 13 },
+        );
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fullscreen, map, points]);
   return null;
 }
 
@@ -81,7 +110,18 @@ function googleMapsRoute(points: Point[]) {
   return `https://www.google.com/maps/dir/?api=1&origin=${first.latitude},${first.longitude}&destination=${last.latitude},${last.longitude}&travelmode=driving${middle ? `&waypoints=${encodeURIComponent(middle)}` : ""}`;
 }
 
-export default function DailyPlanMap({ day, start }: Props) {
+export default function DailyPlanMap({
+  day,
+  start,
+  alternatives,
+  onSelectAlternative,
+  className = "",
+  activeItemId = null,
+  completedItemIds = [],
+  currentPosition = null,
+}: Props) {
+  const mapWrapper = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const points = useMemo(() => {
     const raw: Point[] = [];
     if (start) {
@@ -111,15 +151,48 @@ export default function DailyPlanMap({ day, start }: Props) {
     );
   }, [day, start]);
 
-  const routeUrl = googleMapsRoute(points);
-  if (points.length === 0) {
+  const alternativeMode = alternatives != null;
+  const completed = useMemo(() => new Set(completedItemIds), [completedItemIds]);
+  const alternativePoints = useMemo(
+    () =>
+      alternatives?.map((alternative) => ({
+        key: `alternative-${alternative.id}`,
+        label: alternative.name,
+        time: null,
+        latitude: alternative.latitude,
+        longitude: alternative.longitude,
+      })) ?? [],
+    [alternatives],
+  );
+  const shownPoints = alternativeMode ? alternativePoints : points;
+  const routeUrl = alternativeMode ? null : googleMapsRoute(points);
+  useEffect(() => {
+    const syncFullscreen = () => setFullscreen(document.fullscreenElement === mapWrapper.current);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (!mapWrapper.current) return;
+    try {
+      if (document.fullscreenElement === mapWrapper.current) await document.exitFullscreen();
+      else await mapWrapper.current.requestFullscreen();
+    } catch {
+      // Fullscreen can be blocked by an embedded browser; the normal preview remains usable.
+    }
+  };
+
+  if (shownPoints.length === 0) {
     return <p className="p-4 text-sm text-subtle">วันนี้ยังไม่มีสถานที่ในแผนให้แสดงบนแผนที่</p>;
   }
 
   return (
-    <div className="relative h-64 overflow-hidden bg-surface-2 sm:h-72">
+    <div
+      ref={mapWrapper}
+      className={`relative min-h-72 overflow-hidden bg-surface-2 ${fullscreen ? "h-dvh w-dvw" : ""} ${className}`}
+    >
       <MapContainer
-        center={[points[0].latitude, points[0].longitude]}
+        center={[shownPoints[0].latitude, shownPoints[0].longitude]}
         zoom={12}
         scrollWheelZoom={false}
         className="size-full"
@@ -128,28 +201,65 @@ export default function DailyPlanMap({ day, start }: Props) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <FitPoints points={points} />
-        {points.length > 1 && (
+        <FitPoints points={shownPoints} fullscreen={fullscreen} />
+        {!alternativeMode && points.length > 1 && (
           <Polyline
             positions={points.map((p) => [p.latitude, p.longitude])}
             pathOptions={{ color: "#f4622e", weight: 4, opacity: 0.85, dashArray: "8 6" }}
           />
         )}
-        {points.map((point, index) => (
+        {shownPoints.map((point, index) => (
           <Marker
             key={point.key}
             position={[point.latitude, point.longitude]}
-            icon={numberedIcon(start ? index : index + 1, index === 0 && start != null)}
+            icon={numberedIcon(
+              alternativeMode ? index + 1 : start ? index : index + 1,
+              !alternativeMode && index === 0 && start != null,
+              alternativeMode
+                ? "alternative"
+                : point.key === activeItemId
+                  ? "active"
+                  : completed.has(point.key)
+                    ? "completed"
+                    : "route",
+            )}
           >
             <Popup>
               <div className="min-w-36 text-sm">
                 {point.time && <p className="font-mono text-xs text-secondary">{point.time}</p>}
                 <p className="font-semibold">{point.label}</p>
+                {alternativeMode && onSelectAlternative && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectAlternative(point.key.replace("alternative-", ""))}
+                    className="mt-2 rounded-md bg-accent px-2 py-1 text-xs font-bold text-white"
+                  >
+                    ใช้ที่นี่แทน
+                  </button>
+                )}
               </div>
             </Popup>
           </Marker>
         ))}
+        {currentPosition && !alternativeMode && (
+          <CircleMarker
+            center={[currentPosition.latitude, currentPosition.longitude]}
+            radius={8}
+            pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }}
+          >
+            <Popup>ตำแหน่งล่าสุดของคุณ (ความแม่นยำประมาณ {Math.round(currentPosition.accuracy)} ม.)</Popup>
+          </CircleMarker>
+        )}
       </MapContainer>
+      <button
+        type="button"
+        onClick={() => void toggleFullscreen()}
+        className="absolute right-3 top-3 z-[500] inline-flex size-9 items-center justify-center rounded-full border-2 border-foreground bg-surface text-foreground shadow-hard-sm hover:bg-surface-2"
+        aria-label={fullscreen ? "ออกจากโหมดเต็มจอ" : "ขยายแผนที่เต็มจอ"}
+        title={fullscreen ? "ออกจากเต็มจอ" : "ขยายเต็มจอ"}
+      >
+        {fullscreen ? <Minimize2 className="size-4" aria-hidden="true" /> : <Maximize2 className="size-4" aria-hidden="true" />}
+      </button>
       {routeUrl && (
         <a
           href={routeUrl}
@@ -159,6 +269,12 @@ export default function DailyPlanMap({ day, start }: Props) {
         >
           <ExternalLink className="size-3.5" aria-hidden="true" /> เปิดเส้นทางวันนี้ใน Google Maps
         </a>
+      )}
+      {activeItemId && !alternativeMode && (
+        <div className="absolute bottom-3 left-3 z-[500] inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-hard-sm">
+          <span className="size-2 animate-pulse rounded-full bg-accent motion-reduce:animate-none" aria-hidden="true" />
+          กำลังอัปเดตเส้นทาง
+        </div>
       )}
     </div>
   );

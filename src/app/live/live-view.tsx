@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, LocateFixed, MapPin, Navigation, RefreshCw, RotateCcw } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NearbyPicker } from "@/app/plan/nearby-picker";
@@ -18,6 +19,11 @@ import type { LiveTrip, LiveTripItem, TripProgressStatus } from "@/lib/trip-data
 
 type PositionState = { coords: Coordinates; accuracy: number; updatedAt: number };
 type Stop = { item: LiveTripItem; day: LiveTrip["days"][number] };
+
+const DailyPlanMap = dynamic(() => import("@/components/daily-plan-map"), {
+  ssr: false,
+  loading: () => <div className="h-64 animate-pulse bg-surface-2 motion-reduce:animate-none sm:h-72" />,
+});
 
 function thaiDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" });
@@ -237,18 +243,51 @@ export function LiveView({ initialTrip }: { initialTrip: LiveTrip | null }) {
             <StickerCard className="p-6 text-center"><CheckCircle2 className="mx-auto size-10 text-secondary" aria-hidden="true" /><h2 className="mt-2 text-xl font-bold">เดินทางครบทุกจุดแล้ว</h2><p className="mt-1 text-sm text-muted">จบทริปเรียบร้อย ขอให้เดินทางกลับโดยสวัสดิภาพ</p>{trip.source === "local" && <button type="button" className={buttonClass("ghost", "mt-4")} onClick={resetProgress}><RotateCcw className="size-4" aria-hidden="true" /> เริ่มลำดับใหม่</button>}</StickerCard>
           ) : null}
 
-          {trip.days.map((day) => (
+          {trip.days.map((day) => {
+            const previousDay = trip.days.find((candidate) => candidate.index === day.index - 1);
+            const mapStart = previousDay?.items.toReversed().find((item) => item.place)?.place ?? null;
+            const completedItemIds = day.items
+              .filter((item) => {
+                const order = stopOrder.get(item.id);
+                return item.progressStatus !== "pending" || (trip.source === "local" && order != null && order < stopIndex);
+              })
+              .map((item) => item.id);
+            const activeItemId = day.items.find((item) => stopOrder.get(item.id) === stopIndex)?.id ?? null;
+            return (
             <section key={day.id} className="overflow-hidden rounded-card border-2 border-foreground bg-surface shadow-hard">
               <header className="border-b-2 border-foreground bg-surface-2 px-4 py-3"><h3 className="text-base font-bold">วันที่ {day.index + 1} · {thaiDate(day.date)}</h3></header>
-              <ol className="divide-y divide-dashed divide-border px-4">{day.items.map((item) => {
+              <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
+                <div className="min-w-0 lg:border-r-[1.5px] lg:border-border">
+                  <ol className="divide-y divide-dashed divide-border px-4">{day.items.map((item) => {
                 const order = stopOrder.get(item.id);
                 const isPast = item.progressStatus !== "pending" || (trip.source === "local" && order != null && order < stopIndex);
                 const isCurrent = order === stopIndex;
                 const distance = position && item.place ? distanceMeters(position.coords, item.place) : null;
                 return <li key={item.id} className={`grid gap-3 py-3 sm:grid-cols-[76px_1fr_auto] sm:items-center ${isPast ? "opacity-45" : ""} ${isCurrent ? "-mx-2 rounded-lg bg-accent-soft px-2" : ""}`}><span className="font-mono text-xs font-semibold text-secondary">{item.start ?? "--:--"}</span><div className="min-w-0"><p className="flex items-center gap-1.5 text-sm font-semibold">{isPast ? <CheckCircle2 className="size-3.5 flex-none text-secondary" aria-hidden="true" /> : <MapPin className="size-3.5 flex-none" aria-hidden="true" />}{item.place?.name ?? item.activity}{isCurrent && <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white dark:text-black">จุดถัดไป</span>}</p><p className="mt-0.5 text-xs text-subtle">{[item.activity, item.place?.area, distance != null ? `ห่าง ${formatDistance(distance)}` : null].filter(Boolean).join(" · ")}</p>{item.warning && <p className="mt-1 text-xs font-semibold text-danger">{item.warning}</p>}</div>{item.place && isCurrent && <a href={navigationUrl(item.place.latitude, item.place.longitude)} target="_blank" rel="noopener noreferrer" className={buttonClass("mini")}><Navigation className="size-3.5" aria-hidden="true" /> นำทาง</a>}</li>;
-              })}</ol>
+                  })}</ol>
+                </div>
+                <aside className="flex min-w-0 flex-col border-t-[1.5px] border-border bg-surface-3 lg:border-t-0">
+                  <DailyPlanMap
+                    day={day}
+                    start={mapStart}
+                    className="h-72 lg:h-full"
+                    activeItemId={activeItemId}
+                    completedItemIds={completedItemIds}
+                    currentPosition={
+                      position
+                        ? {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.accuracy,
+                          }
+                        : null
+                    }
+                  />
+                </aside>
+              </div>
             </section>
-          ))}
+            );
+          })}
           {tracking && !position && <p className="flex items-center gap-2 text-sm text-muted"><LocateFixed className="size-4 animate-pulse" aria-hidden="true" /> กำลังหาตำแหน่ง…</p>}
         </div>
       )}

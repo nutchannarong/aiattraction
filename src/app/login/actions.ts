@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { destinationAfterSignIn } from "@/lib/auth-redirect";
+import { isAdminCredentialValid, setAdminAuthenticated } from "@/lib/admin-auth";
 import { createAuthClient, isAuthProviderEnabled } from "@/lib/supabase-server";
 import {
   clearMockUser,
@@ -55,6 +56,14 @@ export async function signIn(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const { email, password } = readCredentials(formData);
   if (!email || !password) redirect(loginUrl({ error: "กรุณากรอกอีเมลและรหัสผ่าน", next }));
+
+  // Admin uses the same login surface as regular users. The signed admin session
+  // is only issued for the protected /admin destination and never falls through
+  // to Supabase auth.
+  if (next === "/admin" && isAdminCredentialValid(email, password)) {
+    await setAdminAuthenticated();
+    redirect("/admin");
+  }
 
   const supabase = await createAuthClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });

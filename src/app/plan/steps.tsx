@@ -224,7 +224,7 @@ export function StepInterests({
   patch,
   groups,
 }: StepProps & { groups: PlaceGroupOption[] }) {
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [openGroup, setOpenGroup] = useState<string | null>(() => draft.interests[0] ?? null);
   const [routeResult, setRouteResult] = useState<{
     key: string;
     result: RoutePlaceGroupsResult;
@@ -314,14 +314,23 @@ export function StepInterests({
                     hideLabel
                     checked={on}
                     onChange={(checked) =>
-                      patch({
-                        interests: checked
-                          ? [...draft.interests, g.key]
-                          : draft.interests.filter((k) => k !== g.key),
-                        interestTypes: checked
-                          ? draft.interestTypes
-                          : draft.interestTypes.filter((id) => !g.types.some((t) => t.id === id)),
-                      })
+                      {
+                        setOpenGroup(
+                          checked
+                            ? g.key
+                            : openGroup === g.key
+                              ? null
+                              : openGroup,
+                        );
+                        patch({
+                          interests: checked
+                            ? [...draft.interests, g.key]
+                            : draft.interests.filter((k) => k !== g.key),
+                          interestTypes: checked
+                            ? draft.interestTypes
+                            : draft.interestTypes.filter((id) => !g.types.some((t) => t.id === id)),
+                        });
+                      }
                     }
                   />
                 </div>

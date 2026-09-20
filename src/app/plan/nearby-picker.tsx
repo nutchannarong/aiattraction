@@ -28,6 +28,7 @@ export function NearbyPicker({
   pickLabel,
   onPick,
   filter,
+  onResultsChange,
 }: {
   categories: string[];
   initialCategory: string;
@@ -41,6 +42,8 @@ export function NearbyPicker({
   pickLabel: string;
   onPick: (place: NearbyPlace) => void;
   filter?: (place: NearbyPlace) => boolean;
+  /** Lets the surrounding map preview mirror the currently listed alternatives. */
+  onResultsChange?: (places: NearbyPlace[]) => void;
 }) {
   const [category, setCategory] = useState(initialCategory);
   const [useGps, setUseGps] = useState(center == null);
@@ -82,6 +85,10 @@ export function NearbyPicker({
     () => (current && "items" in current ? current.items.filter(filter ?? (() => true)) : []),
     [current, filter],
   );
+
+  useEffect(() => {
+    onResultsChange?.(items);
+  }, [items, onResultsChange]);
 
   return (
     <div className="space-y-3">

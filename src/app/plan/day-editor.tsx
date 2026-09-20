@@ -5,9 +5,7 @@ import {
   ArrowUp,
   BedDouble,
   CheckCircle2,
-  ChevronDown,
   Coffee,
-  Map,
   Pencil,
   Plus,
   Shuffle,
@@ -108,7 +106,8 @@ export function DayEditor({
 }) {
   const [local, setLocal] = useState<ModalState | null>(null);
   const [restAfter, setRestAfter] = useState<number | null>(null);
-  const [openMaps, setOpenMaps] = useState<Set<number>>(() => new Set([0]));
+  const [inlineReplan, setInlineReplan] = useState<{ dayIndex: number; item: PlanItem } | null>(null);
+  const [replanCandidates, setReplanCandidates] = useState<NearbyPlace[]>([]);
   const modal: ModalState | null = addRequest
     ? {
         type: "item",
@@ -122,6 +121,8 @@ export function DayEditor({
     if (addRequest) onAddRequestDone();
     setLocal(null);
     setRestAfter(null);
+    setInlineReplan(null);
+    setReplanCandidates([]);
   };
   const dayOf = (index: number) => plan.days.find((d) => d.index === index) ?? plan.days[0];
   const edit = (dayIndex: number, fn: (day: DayPlan) => DayPlan) =>
@@ -153,9 +154,18 @@ export function DayEditor({
                 longitude: draft.origin.longitude,
               }
             : previousPlace;
-        const mapOpen = openMaps.has(day.index);
         const hasLodging = day.items.some((i) => i.kind === "lodging");
         const needsLodging = day.index < plan.days.length - 1 && !hasLodging;
+        const replanning = inlineReplan?.dayIndex === day.index ? inlineReplan : null;
+        const pickReplacement = (candidateId: string) => {
+          const candidate = replanCandidates.find(
+            (place) => `${place.place.source}:${place.place.id}` === candidateId,
+          );
+          if (!candidate) return;
+          edit(day.index, (d) => replaceItem(d, replanItem(replanning!.item, candidate, d.date, draft)));
+          setInlineReplan(null);
+          setReplanCandidates([]);
+        };
         return (
           <section
             key={day.index}
@@ -175,33 +185,6 @@ export function DayEditor({
               )}
               <DayCostTotal day={day} />
             </header>
-
-            <div className="border-b-[1.5px] border-border">
-              <button
-                type="button"
-                aria-expanded={mapOpen}
-                className="flex w-full items-center gap-2 bg-surface-3 px-4 py-2.5 text-left text-sm font-semibold hover:bg-surface-2"
-                onClick={() =>
-                  setOpenMaps((current) => {
-                    const next = new Set(current);
-                    if (next.has(day.index)) next.delete(day.index);
-                    else next.add(day.index);
-                    return next;
-                  })
-                }
-              >
-                <Map className="size-4 text-secondary" aria-hidden="true" />
-                แผนที่ตามแผนของวันที่ {day.index + 1}
-                <span className="ml-auto text-xs font-normal text-subtle">
-                  แสดงเฉพาะจุดในวันนี้
-                </span>
-                <ChevronDown
-                  className={`size-4 transition-transform ${mapOpen ? "rotate-180" : ""}`}
-                  aria-hidden="true"
-                />
-              </button>
-              {mapOpen && <DailyPlanMap day={day} start={mapStart} />}
-            </div>
 
             {!day.finished && (
               <div className="flex flex-wrap items-center gap-2 border-b-[1.5px] border-dashed border-border bg-surface-3 px-4 py-2.5">
@@ -253,19 +236,21 @@ export function DayEditor({
               </div>
             )}
 
-            <ul className="px-4 py-1">
-              {day.items.length === 0 && (
-                <li className="py-4 text-sm text-subtle">
-                  ยังไม่มีกิจกรรม กด “เพิ่มกิจกรรม” เพื่อเริ่ม
-                </li>
-              )}
-              {day.items.map((item, idx) => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  actions={
-                    day.finished || item.kind === "drive" ? null : (
-                      <div className="flex flex-wrap gap-1">
+            <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
+              <div className="min-w-0 lg:border-r-[1.5px] lg:border-border">
+                <ul className="px-4 py-1">
+                  {day.items.length === 0 && (
+                    <li className="py-4 text-sm text-subtle">
+                      ยังไม่มีกิจกรรม กด “เพิ่มกิจกรรม” เพื่อเริ่ม
+                    </li>
+                  )}
+                  {day.items.map((item, idx) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      actions={
+                        day.finished || item.kind === "drive" ? null : (
+                          <div className="flex flex-wrap gap-1">
                         <button
                           type="button"
                           className={iconButton}
@@ -285,7 +270,10 @@ export function DayEditor({
                           type="button"
                           className={`${iconButton} w-auto gap-1 px-2 text-xs font-semibold`}
                           title="หาที่ใกล้เคียงแทน เช่น เมื่อร้านปิด"
-                          onClick={() => setLocal({ type: "replan", dayIndex: day.index, item })}
+                          onClick={() => {
+                            setReplanCandidates([]);
+                            setInlineReplan({ dayIndex: day.index, item });
+                          }}
                         >
                           <Shuffle className="size-4" aria-hidden="true" /> เปลี่ยนแผน
                         </button>
@@ -328,12 +316,74 @@ export function DayEditor({
                         >
                           <Trash2 className="size-4" aria-hidden="true" />
                         </button>
-                      </div>
-                    )
+                          </div>
+                        )
+                      }
+                    />
+                  ))}
+                </ul>
+              </div>
+
+              <aside className="flex min-w-0 flex-col border-t-[1.5px] border-border bg-surface-3 lg:border-t-0">
+                {replanning && (
+                  <div className="flex items-center border-b border-border px-4 py-2 text-xs font-semibold">
+                    เลือกจุดใหม่บนแผนที่
+                    <button
+                      type="button"
+                      className="ml-auto text-info underline"
+                      onClick={() => {
+                        setInlineReplan(null);
+                        setReplanCandidates([]);
+                      }}
+                    >
+                      กลับสู่แผนเดิม
+                    </button>
+                  </div>
+                )}
+                <DailyPlanMap
+                  day={day}
+                  start={mapStart}
+                  alternatives={
+                    replanning && replanCandidates.length > 0
+                      ? replanCandidates.map((candidate) => ({
+                          id: `${candidate.place.source}:${candidate.place.id}`,
+                          name: candidate.place.name,
+                          latitude: candidate.place.latitude,
+                          longitude: candidate.place.longitude,
+                        }))
+                      : undefined
                   }
+                  onSelectAlternative={replanning ? pickReplacement : undefined}
+                  className={replanning ? "lg:h-72 lg:flex-none" : "h-72 lg:h-full"}
                 />
-              ))}
-            </ul>
+                {replanning && (
+                  <div className="max-h-[32rem] touch-pan-y overflow-y-auto overscroll-contain border-t border-border p-3">
+                    <p className="mb-2 text-xs text-subtle">
+                      เลือกจุดที่ใกล้เคียงแทน “{replanning.item.place?.name ?? replanning.item.activity}”
+                    </p>
+                    <NearbyPicker
+                      categories={NEARBY_CATEGORIES.map((c) => c.key).filter(
+                        (key) => key !== "same" || replanning.item.place?.source === "attraction",
+                      )}
+                      initialCategory={categoryForItem(replanning.item)}
+                      center={pointOf(
+                        replanning.item.place ?? placeBefore(day, day.items.indexOf(replanning.item)),
+                      )}
+                      group={replanning.item.place?.source === "attraction" ? replanning.item.place.category : null}
+                      excludeId={replanning.item.place?.id ?? null}
+                      date={day.date}
+                      pickLabel="ใช้ที่นี่แทน"
+                      onResultsChange={setReplanCandidates}
+                      onPick={(place) => {
+                        edit(day.index, (d) => replaceItem(d, replanItem(replanning.item, place, d.date, draft)));
+                        setInlineReplan(null);
+                        setReplanCandidates([]);
+                      }}
+                    />
+                  </div>
+                )}
+              </aside>
+            </div>
 
             <footer className="flex flex-wrap items-center justify-between gap-2 border-t-2 border-foreground bg-surface-2 px-4 py-3">
               {day.finished ? (
