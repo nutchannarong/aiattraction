@@ -95,6 +95,23 @@ function FitPoints({ points, fullscreen }: { points: Point[]; fullscreen: boolea
   return null;
 }
 
+/** Leaflet reads its size only when it mounts. Keep it in sync with responsive grids. */
+function KeepMapSized() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const resize = () => map.invalidateSize({ pan: false });
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
+    const timer = window.setTimeout(resize, 0);
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [map]);
+  return null;
+}
+
 function googleMapsRoute(points: Point[]) {
   if (points.length === 0) return null;
   if (points.length === 1) {
@@ -201,6 +218,7 @@ export default function DailyPlanMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <KeepMapSized />
         <FitPoints points={shownPoints} fullscreen={fullscreen} />
         {!alternativeMode && points.length > 1 && (
           <Polyline

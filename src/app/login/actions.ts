@@ -1,6 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
+import { safeNext } from "@/lib/safe-next";
+import { checkLoginLimit } from "@/lib/login-rate-limit";
+import { signupPasswordError } from "@/lib/password-policy";
 import { redirect } from "next/navigation";
 import { destinationAfterSignIn } from "@/lib/auth-redirect";
 import { isAdminCredentialValid, setAdminAuthenticated } from "@/lib/admin-auth";
@@ -12,12 +15,6 @@ import {
   MOCK_PASSWORD,
   setMockUser,
 } from "@/lib/mock-auth";
-
-/** Only allow same-site relative paths to avoid open redirects. */
-function safeNext(value: FormDataEntryValue | null) {
-  const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
 
 function loginUrl(params: Record<string, string>) {
   return `/login?${new URLSearchParams(params)}`;
@@ -34,7 +31,7 @@ function callbackUrl(origin: string, next: string) {
 
 function readCredentials(formData: FormData) {
   return {
-    email: String(formData.get("email") ?? "").trim(),
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
     password: String(formData.get("password") ?? ""),
   };
 }
@@ -56,6 +53,15 @@ export async function signIn(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const { email, password } = readCredentials(formData);
   if (!email || !password) redirect(loginUrl({ error: "กรุณากรอกอีเมลและรหัสผ่าน", next }));
+  if (email.length > 254 || password.length > 1024 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect(loginUrl({ error: "อีเมลหรือรหัสผ่านไม่ถูกต้อง", next }));
+  }
+  const limit = await checkLoginLimit(email);
+  if (limit !== "allowed") {
+    redirect(loginUrl({ error: limit === "limited"
+      ? "ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่"
+      : "ระบบเข้าสู่ระบบไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง", next }));
+  }
 
   // Admin uses the same login surface as regular users. The signed admin session
   // is only issued for the protected /admin destination and never falls through
@@ -75,9 +81,11 @@ export async function signIn(formData: FormData) {
 export async function signUp(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const { email, password } = readCredentials(formData);
-  if (!email || password.length < 6) {
-    redirect(loginUrl({ error: "กรุณากรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัวอักษร", email, next }));
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect(loginUrl({ error: "กรุณากรอกอีเมลให้ถูกต้อง", next }));
   }
+  const passwordError = signupPasswordError(password);
+  if (passwordError) redirect(loginUrl({ error: passwordError, email, next }));
 
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signUp({

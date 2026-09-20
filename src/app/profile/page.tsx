@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/safe-next";
 import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
 import { buttonClass } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -29,7 +30,7 @@ function first(value: string | string[] | undefined) {
 
 export default async function ProfilePage({ searchParams }: PageProps<"/profile">) {
   const params = await searchParams;
-  const next = first(params.next) ?? "";
+  const next = safeNext(first(params.next), "");
   const user = await getCurrentUser();
   if (!user) {
     const back = next ? `/profile?next=${encodeURIComponent(next)}` : "/profile";

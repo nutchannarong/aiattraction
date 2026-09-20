@@ -1,25 +1,42 @@
 import "server-only";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 const COOKIE = "thainhaidee-admin";
 const TTL = 60 * 60 * 8;
-const PASSWORD_HASH = "9789850896126f3e3d509898776426a5eb26e61d6fcf362bf74536efb5e8cca4d0b4c7eca0a078fd7bae862c1552d4ffa5e24d0de8bbdf68f844b8539f598e59";
+function credentials() {
+  const username = process.env.ADMIN_USERNAME;
+  const encoded = process.env.ADMIN_PASSWORD_HASH;
+  const match = /^scrypt:([a-f0-9]{32}):([a-f0-9]{128})$/.exec(encoded ?? "");
+  if (!username || username.length > 100 || username !== username.trim() || !match) return null;
+  return { username, salt: match[1], hash: match[2], encoded: encoded! };
+}
 
 export function sessionConfigured() {
-  return (process.env.ADMIN_SESSION_SECRET?.length ?? 0) >= 32;
+  return (process.env.ADMIN_SESSION_SECRET?.length ?? 0) >= 32 && credentials() !== null;
 }
 
 function signature(payload: string) {
-  if (!sessionConfigured()) throw new Error("ADMIN_SESSION_SECRET must contain at least 32 characters");
-  return createHmac("sha256", process.env.ADMIN_SESSION_SECRET!).update(payload).digest("hex");
+  if (!sessionConfigured()) throw new Error("Admin credentials or session secret are not configured");
+  // Credential rotation revokes existing sessions, including old v1 cookies.
+  const account = credentials()!;
+  return createHmac("sha256", process.env.ADMIN_SESSION_SECRET!)
+    .update(JSON.stringify(["admin-v2", account.username, account.encoded, payload])).digest("hex");
 }
 
-export function checkAdminPassword(username: string, password: string) {
-  if (password.length > 200) return false;
-  const hash = scryptSync(password, "thainhaidee-admin-v1", 64);
-  return timingSafeEqual(hash, Buffer.from(PASSWORD_HASH, "hex")) && username === "admin";
+export async function checkAdminPassword(username: string, password: string) {
+  const account = credentials();
+  if (!account || password.length < 16 || password.length > 200 || username.length > 100) return false;
+  const hash = await new Promise<Buffer>((resolve, reject) => {
+    scrypt(password, account.salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 },
+      (error, result) => error ? reject(error) : resolve(result));
+  });
+  const usernameMatches = timingSafeEqual(
+    createHash("sha256").update(username).digest(),
+    createHash("sha256").update(account.username).digest(),
+  );
+  return timingSafeEqual(hash, Buffer.from(account.hash, "hex")) && usernameMatches;
 }
 
 export async function isAdmin() {

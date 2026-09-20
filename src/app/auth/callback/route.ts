@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/safe-next";
 import { destinationAfterSignIn } from "@/lib/auth-redirect";
 import { createAuthClient } from "@/lib/supabase-server";
 import { recordAnalyticsEvent } from "@/lib/analytics";
@@ -7,8 +8,7 @@ import { recordAnalyticsEvent } from "@/lib/analytics";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const nextParam = searchParams.get("next") ?? "/";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
+  const next = safeNext(searchParams.get("next"));
 
   if (code) {
     const supabase = await createAuthClient();

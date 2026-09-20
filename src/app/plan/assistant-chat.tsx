@@ -414,7 +414,7 @@ export function AssistantChat({
             </div>
             <p className="mt-1.5 text-[10.5px] leading-snug text-subtle">
               คำตอบจาก AI อาจคลาดเคลื่อน ตรวจเวลาเปิดและราคาก่อนไป · คำถามและสรุปทริป (ไม่มีพิกัด)
-              ถูกส่งไปประมวลผลผ่าน OpenRouter
+              ถูกส่งไปประมวลผลผ่าน OpenRouter · อย่าส่งรหัสผ่าน รหัส OTP หรือข้อมูลลับในแชต
             </p>
           </form>
         </section>

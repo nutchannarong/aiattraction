@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/safe-next";
 import { GoogleIcon } from "@/components/google-icon";
 import { buttonClass } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -8,6 +9,7 @@ import { StickerCard } from "@/components/ui/sticker-card";
 import { MOCK_EMAIL, MOCK_PASSWORD } from "@/lib/mock-auth";
 import { getCurrentUser } from "@/lib/supabase-server";
 import { signIn, signInAsDemo, signInWithGoogle, signUp } from "./actions";
+import { PasswordField } from "./password-field";
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };
 
@@ -17,8 +19,7 @@ function first(value: string | string[] | undefined) {
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
-  const rawNext = first(params.next) ?? "/";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  const next = safeNext(first(params.next));
   const isAdminLogin = next === "/admin";
   // A regular app session is not an admin session. Keeping the admin login
   // visible also prevents a redirect loop when a demo user is already signed in.
@@ -102,21 +103,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
               className={field}
             />
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="password" className="text-sm font-medium">
-              รหัสผ่าน
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={6}
-              autoComplete="current-password"
-              className={field}
-            />
-            <p className="text-xs text-subtle">อย่างน้อย 6 ตัวอักษร</p>
-          </div>
+          <PasswordField className={field} />
           <div className={`grid gap-2 pt-1 ${isAdminLogin ? "" : "sm:grid-cols-2"}`}>
             <button formAction={signIn} className={buttonClass("cta", "w-full")}>
               เข้าสู่ระบบ
