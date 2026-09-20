@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     for (const row of chart.rows) rows.push([section.label, chart.title, row.label, row.value, range.from, range.to, chart.note]);
     if (!chart.rows.length) rows.push([section.label, chart.title, "ยังไม่มีข้อมูล", "", range.from, range.to, chart.note]);
   }
-  const metrics = tab === "patterns" ? dashboard.patternStats : tab === "vehicles" ? dashboard.vehicleStats : tab === "overview" ? dashboard.overview : [];
+  const metrics = tab === "patterns" ? dashboard.patternStats : tab === "vehicles" ? dashboard.vehicleStats : tab === "finance" ? dashboard.financeStats : tab === "overview" ? dashboard.overview : [];
   for (const m of metrics) rows.push(["สรุป", m.label, "", m.value, range.from, range.to, m.note]);
   return new Response("\uFEFF" + rows.map(r => r.map(cell).join(",")).join("\r\n"), { headers: {
     "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="thainhaidee-report-${range.from}-${range.to}.csv"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",

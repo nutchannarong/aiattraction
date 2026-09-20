@@ -8,8 +8,10 @@ export type TripRow = {
   travelers: { adults?: number; children?: number; seniors?: number }; occasion: string | null; interests: string[];
   vehicle: { type?: string; brand?: string; year?: number; cc?: number; fuel?: string };
   route_style: string; route_summary: { distance_km?: number; fuel_cost?: number; fuel_units?: number; travel_purpose?: string | null } | null;
-  trip_days: { day_index: number; date: string; finished_at: string | null; trip_items: { start_time: string | null; kind: string; place_category: string | null; cost_estimate: number | null; cost_category: string | null }[] }[];
+  trip_days: { day_index: number; date: string; finished_at: string | null; trip_items: TripItemRow[] }[];
 };
+export type BookingRow = { platform: string | null; price: number | null; status: string | null };
+export type TripItemRow = { start_time: string | null; kind: string; place_category: string | null; cost_estimate: number | null; cost_category: string | null; trip_bookings?: BookingRow[] | null };
 export type SessionRow = { id: string; user_id: string; started_at: string; last_seen_at: string; active_seconds: number };
 export type EventRow = { id: number; user_id: string; kind: string; provider: string | null; created_at: string };
 export type ReportInput = { profiles: ProfileRow[]; trips: TripRow[]; events: EventRow[]; sessions: SessionRow[]; provinces: { id: string; name_th: string }[]; groups: { key: string; label_th: string }[] };
@@ -32,6 +34,15 @@ const count = (values: (string | null | undefined)[], limit = 100): Row[] => {
   return [...counts].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, limit);
 };
 const avg = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+const median = (values: number[]) => { if (!values.length) return null; const s = [...values].sort((a, b) => a - b); const half = Math.floor(s.length / 2); return s.length % 2 ? s[half] : (s[half - 1] + s[half]) / 2; };
+/** Average of a numeric measure per group, for "average budget by …" charts. */
+const avgBy = <T,>(items: T[], key: (item: T) => string, value: (item: T) => number | null, limit = 100, minCount = 1): Row[] => {
+  const groups = new Map<string, number[]>();
+  for (const item of items) { const v = value(item); if (v === null || !Number.isFinite(v)) continue; const k = key(item).trim() || "ไม่ระบุ"; groups.set(k, [...(groups.get(k) ?? []), v]); }
+  return [...groups].filter(([, v]) => v.length >= minCount).map(([label, v]) => ({ label, value: Math.round(avg(v) ?? 0) })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, limit);
+};
+const baht = (n: number) => Math.round(n);
 const mode = (values: string[]) => count(values)[0]?.label ?? "—";
 const unique = (values: string[]) => new Set(values).size;
 const numeric = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -104,6 +115,26 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
   const annual = count(input.trips.filter(t => bangkokDate(t.created_at) >= yearStart && bangkokDate(t.created_at) <= range.to).map(t => t.user_id));
   const usersWithTrips = unique(trips.map(t => t.user_id));
   const costValues = trips.map(t => (t.route_summary?.fuel_cost ?? 0) + t.trip_days.flatMap(d => d.trip_items).filter(i => i.cost_category !== "fuel").reduce((s,i) => s + (i.cost_estimate ?? 0), 0));
+  // ---- Money: everything here is the planner's estimate, not what people actually paid.
+  const costCategories = { fuel: "ค่าน้ำมัน / พลังงาน", travel: "ค่าเดินทางอื่น (ทางด่วน/ที่จอด)", admission: "ค่าเข้าชม", food: "ค่าอาหาร", lodging: "ค่าที่พัก", other: "อื่น ๆ" };
+  const bookings = tripItems.flatMap(i => i.trip_bookings ?? []);
+  const bookedPrices = bookings.filter(b => b.status === "booked").map(b => b.price).filter(numeric);
+  const nightPrices = tripItems.filter(i => i.kind === "lodging").map(i => i.cost_estimate).filter(numeric).filter(n => n > 0);
+  const tripCost = (t: TripRow) => (t.route_summary?.fuel_cost ?? 0) + t.trip_days.flatMap(d => d.trip_items).filter(i => i.cost_category !== "fuel").reduce((s,i) => s + (i.cost_estimate ?? 0), 0);
+  const perPerson = (t: TripRow) => travelerCount(t) ? tripCost(t) / travelerCount(t) : null;
+  const categoryTotals = Object.entries(costCategories).map(([key, label]) => ({ label, value: baht(key === "fuel"
+    ? sum(trips.map(t => t.route_summary?.fuel_cost ?? 0)) + sum(tripItems.filter(i => i.cost_category === "fuel").map(i => i.cost_estimate ?? 0))
+    : sum(tripItems.filter(i => (i.cost_category ?? "other") === key && i.cost_category !== "fuel").map(i => i.cost_estimate ?? 0))) })).filter(r => r.value > 0);
+  const totalCost = sum(costValues);
+  const totalFuel = sum(trips.map(t => t.route_summary?.fuel_cost ?? 0));
+  // Ordered low to high so the chart reads like a scale, not a ranking.
+  const byBand = (bands: string[]) => (a: Row, b: Row) => bands.indexOf(a.label) - bands.indexOf(b.label);
+  const BUDGET_BANDS = ["ต่ำกว่า 2,000 ฿", "2,000–4,999 ฿", "5,000–9,999 ฿", "10,000–19,999 ฿", "20,000–49,999 ฿", "50,000 ฿ ขึ้นไป"];
+  const PRICE_BANDS = ["ต่ำกว่า 500 ฿", "500–999 ฿", "1,000–1,499 ฿", "1,500–2,499 ฿", "2,500–3,999 ฿", "4,000 ฿ ขึ้นไป"];
+  const budgetBand = (value: number) => value < 2000 ? "ต่ำกว่า 2,000 ฿" : value < 5000 ? "2,000–4,999 ฿" : value < 10000 ? "5,000–9,999 ฿" : value < 20000 ? "10,000–19,999 ฿" : value < 50000 ? "20,000–49,999 ฿" : "50,000 ฿ ขึ้นไป";
+  const priceBand = (value: number) => value < 500 ? "ต่ำกว่า 500 ฿" : value < 1000 ? "500–999 ฿" : value < 1500 ? "1,000–1,499 ฿" : value < 2500 ? "1,500–2,499 ฿" : value < 4000 ? "2,500–3,999 ฿" : "4,000 ฿ ขึ้นไป";
+  const vehicleLabel = (t: TripRow) => labelMap({ motorcycle: "มอเตอร์ไซค์", eco_car: "รถอีโคคาร์", sedan: "รถเก๋ง", suv: "SUV", pickup: "รถกระบะ", van: "รถตู้", bus: "รถบัส" }, t.vehicle.type);
+  const estimateNote = "ประมาณการจากแผน ไม่ใช่ยอดใช้จ่ายจริง";
   const sections: Section[] = [
     { id: "overview", label: "ภาพรวม", title: "การเข้าใช้งานและเส้นทางผู้ใช้", charts: [
       ...["google", "email"].map(provider => chart(`login-${provider}`, `เข้าสู่ระบบ · ${provider === "google" ? "Google" : "อีเมล"}`, "จำนวนครั้งต่อวัน · จัดกลุ่มตาม provider หลักของบัญชี", dates.map(date => ({ label: date, value: events.filter(e => e.kind === "login" && e.provider === provider && bangkokDate(e.created_at) === date).length })), provider === "google" ? "#2b79d8" : "#0d9b80")),
@@ -140,6 +171,18 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
       chart("travelers", "จำนวนผู้เดินทางต่อทริป", cohort, count(trips.map(t => `${travelerCount(t)} คน`)), "#b58a08"),
       chart("frequency", "จำนวนทริปต่อคนใน 12 เดือน", `365 วันถึง ${range.to} · เฉพาะผู้ที่บันทึกทริป`, count(annual.map(r => r.value === 1 ? "1 ทริป" : r.value === 2 ? "2 ทริป" : r.value <= 4 ? "3–4 ทริป" : "5 ทริปขึ้นไป")), "#bd3763"),
     ] },
+    { id: "finance", label: "การเงิน", title: "เงินในแผนเดินทาง (ประมาณการ)", charts: [
+      chart("cost-categories", "ค่าใช้จ่ายรวมแยกหมวด", `${estimateNote} · หน่วยบาท`, categoryTotals),
+      chart("cost-band", "ช่วงงบต่อทริป", `${estimateNote} · จำนวนทริป`, count(costValues.map(budgetBand)).sort(byBand(BUDGET_BANDS)), "#2b79d8"),
+      chart("cost-monthly", "ค่าใช้จ่ายเฉลี่ยต่อทริป รายเดือน", `${estimateNote} · แยกตามเดือนที่ออกเดินทาง · บาท`, avgBy(trips, t => t.start_date.slice(0,7), tripCost).sort((a,b) => a.label.localeCompare(b.label)), "#0d9b80"),
+      chart("cost-destination", "งบเฉลี่ยตามจังหวัดปลายทาง · 10 อันดับ", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, avgBy(trips, t => province(t.destination), tripCost, 10), "#7952c7"),
+      chart("cost-vehicle", "งบเฉลี่ยตามประเภทรถ", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, avgBy(trips, vehicleLabel, tripCost), "#b58a08"),
+      chart("cost-duration", "งบเฉลี่ยตามจำนวนวัน", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, avgBy(trips, t => `${duration(t)} วัน`, tripCost).sort((a,b) => parseInt(a.label) - parseInt(b.label)), "#bd3763"),
+      chart("cost-per-person", "งบเฉลี่ยต่อคน ตามขนาดกลุ่ม", `${estimateNote} · บาทต่อคน`, avgBy(trips, t => `${travelerCount(t)} คน`, perPerson).sort((a,b) => parseInt(a.label) - parseInt(b.label)), "#2b79d8"),
+      chart("lodging-price", "ราคาที่พักต่อคืนในแผน", `${estimateNote} · จำนวนคืน`, count(nightPrices.map(priceBand)).sort(byBand(PRICE_BANDS)), "#0d9b80"),
+      chart("booking-platform", "ช่องทางจองที่พักที่เลือก", "จากรายการจองในแผนที่บันทึก · จำนวนคืน", count(bookings.map(b => labelMap({ agoda: "Agoda", booking: "Booking.com", airbnb: "Airbnb", direct: "จองตรงกับที่พัก", other: "ยังไม่เลือกช่องทาง" }, b.platform))), "#7952c7"),
+      chart("booking-status", "สถานะการจองที่พัก", "todo/opened = ยังไม่ยืนยัน · booked = ผู้ใช้กรอกว่าจองแล้ว", count(bookings.map(b => labelMap({ todo: "ยังไม่จอง", opened: "เปิดเว็บจองแล้ว", booked: "จองแล้ว", skipped: "ไม่จอง / จัดการเอง" }, b.status))), "#b58a08"),
+    ] },
     { id: "vehicles", label: "ยานพาหนะ", title: "ผู้ใช้เดินทางด้วยอะไร", charts: [
       chart("vehicle", "ประเภทรถ", cohort, count(trips.map(t => labelMap({ motorcycle: "มอเตอร์ไซค์", eco_car: "รถอีโคคาร์", sedan: "รถเก๋ง", suv: "SUV", pickup: "รถกระบะ", van: "รถตู้", bus: "รถบัส" }, t.vehicle.type)))),
       chart("brand", "ยี่ห้อรถ · 10 อันดับ", cohort, count(trips.map(t => t.vehicle.brand), 10), "#2b79d8"),
@@ -152,8 +195,20 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
   const latestDays = daily.filter(d => d.label.startsWith(range.to.slice(0,7)));
   const overview = [metric("ผู้ใช้ใหม่ในช่วงนี้", profiles.length, "ตามวันที่สมัครสมาชิก"), metric("DAU เฉลี่ย", dailyAvg, `ค่าเฉลี่ย ${days} วัน รวมวันที่ไม่มีการใช้งาน`), metric("MAU เดือนล่าสุด", latestMau, "เฉพาะวันที่อยู่ในช่วงเลือก"), metric("Stickiness", latestMau ? (avg(latestDays.map(d => d.value)) ?? 0) / latestMau * 100 : null, "DAU เฉลี่ย ÷ MAU ของเดือนล่าสุด", "%"), metric("เวลาใช้งานเฉลี่ย", avg(sessions.map(s => s.active_seconds / 60)), "ต่อ session ที่เก็บได้", " นาที"), metric("ทริปที่บันทึก", trips.length, cohort), metric("ออกเดินทางแล้ว", started, "สถานะ active / done · หน้าเริ่มเดินทางยังไม่เปิดใช้"), metric("จบครบทุกวัน", finished, "สถานะ done หรือทุกวันมี finished_at")];
   const patternStats = [metric("ระยะทริปที่พบบ่อย", mode(trips.map(t => `${duration(t)} วัน`)), cohort), metric("จำนวนคนที่พบบ่อย", mode(trips.map(t => `${travelerCount(t)} คน`)), cohort), metric("ไปกับใครมากที่สุด", mode(trips.map(companion)), cohort), metric("ค่าใช้จ่ายเฉลี่ย / ทริป", avg(costValues), "ประมาณการค่าน้ำมันและรายการในแผน", " ฿"), metric("ทริปเฉลี่ยต่อผู้วางแผน", usersWithTrips ? trips.length / usersWithTrips : null, "เฉพาะผู้ที่บันทึกอย่างน้อย 1 ทริป"), metric("ทริปต่อผู้วางแผน / 30 วัน", usersWithTrips ? trips.length / usersWithTrips / days * 30 : null, "ปรับตามจำนวนวันของช่วงเลือก"), metric("ทริปต่อผู้วางแผน / สัปดาห์", usersWithTrips ? trips.length / usersWithTrips / days * 7 : null, "ปรับตามจำนวนวันของช่วงเลือก")];
+  const financeStats = [
+    metric("มูลค่าแผนรวม", totalCost, `${estimateNote} · ${trips.length} ทริป`, " ฿"),
+    metric("ค่าใช้จ่ายเฉลี่ย / ทริป", avg(costValues), estimateNote, " ฿"),
+    metric("มัธยฐาน / ทริป", median(costValues), "ครึ่งหนึ่งของทริปใช้งบต่ำกว่านี้", " ฿"),
+    metric("เฉลี่ย / คน", avg(trips.map(perPerson).filter(numeric)), "หารด้วยจำนวนผู้เดินทางในแต่ละทริป", " ฿"),
+    metric("เฉลี่ย / คน / วัน", avg(trips.map(t => { const p = perPerson(t); return p === null ? null : p / duration(t); }).filter(numeric)), "ใช้เทียบงบรายวันระหว่างทริป", " ฿"),
+    metric("ค่าน้ำมันรวม", totalFuel, "ประมาณจากระยะทางและราคาน้ำมันที่ผู้ใช้กรอก", " ฿"),
+    metric("สัดส่วนค่าน้ำมัน", totalCost ? totalFuel / totalCost * 100 : null, "ของมูลค่าแผนรวม", "%"),
+    metric("ค่าใช้จ่ายเฉลี่ย / กม.", avg(trips.map(t => { const km = t.route_summary?.distance_km; return numeric(km) && km > 0 ? tripCost(t) / km : null; }).filter(numeric)), "รวมทุกหมวด หารด้วยระยะทางตามแผน", " ฿"),
+    metric("ราคาที่พักเฉลี่ย / คืน", avg(nightPrices), `${nightPrices.length} คืนในแผนที่บันทึก`, " ฿"),
+    metric("ราคาที่จองจริงเฉลี่ย / คืน", avg(bookedPrices), `${bookedPrices.length} คืนที่ผู้ใช้กรอกว่าจองแล้ว`, " ฿"),
+  ];
   const liquidTrips = trips.filter(t => t.vehicle.fuel && !["ngv","ev"].includes(t.vehicle.fuel));
   const fuelUnits = liquidTrips.map(t => t.route_summary?.fuel_units).filter(numeric);
   const vehicleStats = [metric("เชื้อเพลิงเฉลี่ย / ทริป", avg(fuelUnits), "เฉพาะเชื้อเพลิงหน่วยลิตร ไม่รวม NGV / EV", " ลิตร"), metric("ค่าพลังงานเฉลี่ย / ทริป", avg(trips.map(t => t.route_summary?.fuel_cost).filter(numeric)), "ประมาณการรวมทุกชนิดพลังงาน", " ฿"), metric("เชื้อเพลิงรวม", fuelUnits.reduce((a,b)=>a+b,0), "เฉพาะรายการที่มีหน่วยลิตร", " ลิตร"), metric("ระยะทางเฉลี่ย", avg(trips.map(t => t.route_summary?.distance_km).filter(numeric)), "ระยะทางตามแผน", " กม.")];
-  return { range, sections, overview, patternStats, vehicleStats, heatmap, trips: trips.length, profiles: profiles.length };
+  return { range, sections, overview, patternStats, vehicleStats, financeStats, heatmap, trips: trips.length, profiles: profiles.length };
 }

@@ -7,7 +7,7 @@ import { adminLogout } from "./login/actions";
 import { ReportChart } from "./report-chart";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const TABS = [{ id: "overview", label: "ภาพรวม" }, { id: "users", label: "ผู้ใช้" }, { id: "destinations", label: "ปลายทาง" }, { id: "timing", label: "ช่วงเวลาเดินทาง" }, { id: "patterns", label: "รูปแบบทริป" }, { id: "vehicles", label: "ยานพาหนะ" }, { id: "schema", label: "โครงสร้างข้อมูล" }];
+const TABS = [{ id: "overview", label: "ภาพรวม" }, { id: "users", label: "ผู้ใช้" }, { id: "destinations", label: "ปลายทาง" }, { id: "timing", label: "ช่วงเวลาเดินทาง" }, { id: "patterns", label: "รูปแบบทริป" }, { id: "finance", label: "การเงิน" }, { id: "vehicles", label: "ยานพาหนะ" }, { id: "schema", label: "โครงสร้างข้อมูล" }];
 function Stats({ items }: { items: Dashboard["overview"] }) {
   return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{items.map((s,i) => <article key={s.label} className="rounded-xl border-[1.5px] border-foreground bg-surface p-4 shadow-hard-sm"><p className="text-xs font-semibold text-subtle">{s.label}</p><p className={`my-2 break-words font-mono text-2xl font-bold ${i%4 === 0 ? "text-accent" : ""}`}>{s.value}</p><p className="text-[11px] leading-relaxed text-subtle">{s.note}</p></article>)}</div>;
 }
@@ -36,7 +36,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {!result.error && tab !== "schema" && <>
       {tab === "overview" && <Stats items={dashboard.overview} />}
       {tab === "patterns" && <Stats items={dashboard.patternStats} />}
+      {tab === "finance" && <Stats items={dashboard.financeStats} />}
       {tab === "vehicles" && <Stats items={dashboard.vehicleStats} />}
+      {tab === "finance" && <div className="rounded-xl border border-border border-l-4 border-l-brand bg-surface p-4 text-xs leading-relaxed text-muted"><b>ตัวเลขทั้งหมดเป็นประมาณการจากแผน</b> · ค่าน้ำมันคำนวณจากระยะทาง อัตราสิ้นเปลือง และราคาน้ำมันที่ผู้ใช้กรอก ส่วนค่าอาหาร ที่พัก และค่าเข้าชมมาจากค่าเริ่มต้นของระบบหรือที่ผู้ใช้แก้เอง ยังไม่มีการยืนยันยอดใช้จ่ายจริง ยกเว้นราคาที่พักที่ผู้ใช้กรอกตอนจอง</div>}
       <div><h2 className="text-xl font-bold">{section?.title}</h2><p className="mt-1 text-xs text-subtle">{range.from} – {range.to}</p></div>
       {tab === "timing" && <article className="rounded-2xl border-[1.5px] border-foreground bg-surface p-5 shadow-hard-sm"><h3 className="font-bold">วันในสัปดาห์ × ชั่วโมงออกเดินทางตามแผน</h3><p className="mt-1 text-xs text-subtle">เวลาเริ่มขับรถวันแรก · ช่องสีเข้มแสดงจำนวนแผนที่มากขึ้น</p><div className="mt-5 overflow-x-auto"><div className="min-w-[650px]"><div className="mb-2 grid grid-cols-[40px_repeat(24,minmax(0,1fr))] gap-1 text-[10px] text-subtle"><span />{Array.from({length:24},(_,h)=><span key={h}>{h%3===0?String(h).padStart(2,"0"):""}</span>)}</div>{dashboard.heatmap.map((hours,d)=><div key={d} className="mb-1 grid grid-cols-[40px_repeat(24,minmax(0,1fr))] gap-1"><span className="self-center text-xs text-subtle">{["จ.","อ.","พ.","พฤ.","ศ.","ส.","อา."][d]}</span>{hours.map((value,h)=><div key={h} role="img" aria-label={`${["จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์","อาทิตย์"][d]} ${h}:00 จำนวน ${value} ทริป`} title={`${h}:00 · ${value} ทริป`} className="h-8 rounded-sm" style={{ background: value ? `color-mix(in srgb, var(--accent) ${20+value/Math.max(...dashboard.heatmap.flat(),1)*80}%, var(--surface))` : "var(--surface-2)" }} />)}</div>)}</div></div></article>}
       <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{section?.charts.map(chart => <ReportChart key={chart.id} chart={chart} />)}</div>
@@ -45,6 +47,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       ["profiles", "ผู้ใช้ใหม่ เพศ อายุ อาชีพ จังหวัด", "กรอง created_at; ไม่ระบุเมื่อผู้ใช้ยังไม่กรอก"],
       ["trips", "ปลายทาง รูปแบบทริป รถ ระยะทาง และพลังงาน", "เฉพาะแผนที่บันทึก; สถิติ 12 เดือนใช้ช่วง 365 วัน"],
       ["trip_days / trip_items", "เวลาตามแผน ค่าใช้จ่าย จุดแวะ และวันที่ทำเสร็จ", "เวลาออกเดินทางคือเวลาตามแผน ไม่ใช่เหตุการณ์จริง"],
+      ["trip_items.cost_estimate / cost_category", "รายงานการเงินทุกหมวด", "ประมาณการจากแผน ผู้ใช้แก้เองได้ ไม่ใช่ยอดจ่ายจริง"],
+      ["trip_bookings", "ช่องทางจอง สถานะจอง และราคาที่จองจริง", "ผู้ใช้กรอกเอง เฉพาะคืนที่กดยืนยันว่าจองแล้ว"],
       ["analytics_events", "เข้าสู่ระบบและร่างแผนสำเร็จ", "เริ่มนับหลังติดตั้ง; provider หลักของบัญชีอาจต่างจากช่องทางเข้าใช้ล่าสุด"],
       ["analytics_sessions", "DAU, MAU และเวลาใช้งาน", "สมาชิกที่เข้าสู่ระบบ; heartbeat 30 วินาที ขณะหน้าเว็บอยู่ด้านหน้า"],
       ["route_summary.travel_purpose", "วันหยุด เทศกาล และโอกาสพิเศษ", "เริ่มเก็บจากแบบฟอร์มใหม่; แผนเก่าแสดงไม่ระบุ"],
