@@ -24,7 +24,7 @@ export async function loadReports(range: { from: string; to: string }) {
   }
   try {
     const [profiles, trips, events, sessions, provinces, groups] = await Promise.all([
-      rows<ReportInput["profiles"][number]>("profiles", "id,birth_date,gender,occupation,home_province_id,created_at", "created_at"),
+      rows<ReportInput["profiles"][number]>("profiles", "id,birth_date,gender,occupation,home_province_id,created_at"),
       rows<ReportInput["trips"][number]>("trips", "id,user_id,created_at,start_date,end_date,status,origin,destination,travelers,occasion,interests,vehicle,route_style,route_summary,trip_days(day_index,date,finished_at,trip_items(start_time,kind,place_category,cost_estimate,cost_category,trip_bookings(platform,price,status)))", "created_at", yearStart < start ? yearStart : start),
       rows<ReportInput["events"][number]>("analytics_events", "id,user_id,kind,provider,created_at", "created_at"),
       rows<ReportInput["sessions"][number]>("analytics_sessions", "id,user_id,started_at,last_seen_at,active_seconds", "started_at"),

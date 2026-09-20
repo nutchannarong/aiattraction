@@ -40,8 +40,10 @@ const median = (values: number[]) => { if (!values.length) return null; const s 
 const avgBy = <T,>(items: T[], key: (item: T) => string, value: (item: T) => number | null, limit = 100, minCount = 1): Row[] => {
   const groups = new Map<string, number[]>();
   for (const item of items) { const v = value(item); if (v === null || !Number.isFinite(v)) continue; const k = key(item).trim() || "ไม่ระบุ"; groups.set(k, [...(groups.get(k) ?? []), v]); }
-  return [...groups].filter(([, v]) => v.length >= minCount).map(([label, v]) => ({ label, value: Math.round(avg(v) ?? 0) })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, limit);
+  return [...groups].filter(([, v]) => v.length >= minCount).map(([label, v]) => ({ label: `${label} · ${v.length} ทริป`, value: Math.round(avg(v) ?? 0) })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, limit);
 };
+/** Strips the " · n ทริป" suffix avgBy adds, for use inside a summary metric. */
+const topGroup = (rows: Row[]) => rows.length ? `${rows[0].label.split(" · ")[0]} · ${numberFormat(rows[0].value)} ฿` : null;
 const baht = (n: number) => Math.round(n);
 const mode = (values: string[]) => count(values)[0]?.label ?? "—";
 const unique = (values: string[]) => new Set(values).size;
@@ -135,6 +137,20 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
   const priceBand = (value: number) => value < 500 ? "ต่ำกว่า 500 ฿" : value < 1000 ? "500–999 ฿" : value < 1500 ? "1,000–1,499 ฿" : value < 2500 ? "1,500–2,499 ฿" : value < 4000 ? "2,500–3,999 ฿" : "4,000 ฿ ขึ้นไป";
   const vehicleLabel = (t: TripRow) => labelMap({ motorcycle: "มอเตอร์ไซค์", eco_car: "รถอีโคคาร์", sedan: "รถเก๋ง", suv: "SUV", pickup: "รถกระบะ", van: "รถตู้", bus: "รถบัส" }, t.vehicle.type);
   const estimateNote = "ประมาณการจากแผน ไม่ใช่ยอดใช้จ่ายจริง";
+  // Who spends what: join each trip to its owner's profile (all profiles, not only new ones).
+  const profileOf = new Map(input.profiles.map(p => [p.id, p]));
+  const ownerNote = "จับคู่ทริปกับโปรไฟล์เจ้าของแผน · โปรไฟล์ที่ยังไม่กรอกจะอยู่ในกลุ่มไม่ระบุ";
+  const owner = (t: TripRow) => profileOf.get(t.user_id);
+  const ownerGender = (t: TripRow) => labelMap(gender, owner(t)?.gender);
+  const ownerAge = (t: TripRow) => ageBand(owner(t)?.birth_date ?? null);
+  const ownerJob = (t: TripRow) => owner(t)?.occupation?.trim() || "ไม่ระบุ";
+  const ownerHome = (t: TripRow) => { const id = owner(t)?.home_province_id; return id && provinceNames[id] ? provinceNames[id] : "ไม่ระบุ"; };
+  const purposeLabel = (t: TripRow) => labelMap({ holiday: "วันหยุดยาว", festival: "เทศกาล / ประเพณี", homecoming: "กลับบ้าน / เยี่ยมญาติ", celebration: "ฉลองวันพิเศษ", leisure: "พักผ่อน / เที่ยวทั่วไป" }, t.route_summary?.travel_purpose);
+  const perPersonDay = (t: TripRow) => { const p = perPerson(t); return p === null ? null : p / duration(t); };
+  // One row per (trip × interest) so a trip that picked three styles counts in all three.
+  const tripInterests = trips.flatMap(t => (t.interests.length ? t.interests : ["ไม่ระบุ"]).map(key => ({ trip: t, style: groupNames[key] ?? key })));
+  const byAge = avgBy(trips, ownerAge, tripCost);
+  const byCompanion = avgBy(trips, companion, tripCost);
   const sections: Section[] = [
     { id: "overview", label: "ภาพรวม", title: "การเข้าใช้งานและเส้นทางผู้ใช้", charts: [
       ...["google", "email"].map(provider => chart(`login-${provider}`, `เข้าสู่ระบบ · ${provider === "google" ? "Google" : "อีเมล"}`, "จำนวนครั้งต่อวัน · จัดกลุ่มตาม provider หลักของบัญชี", dates.map(date => ({ label: date, value: events.filter(e => e.kind === "login" && e.provider === provider && bangkokDate(e.created_at) === date).length })), provider === "google" ? "#2b79d8" : "#0d9b80")),
@@ -179,6 +195,14 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
       chart("cost-vehicle", "งบเฉลี่ยตามประเภทรถ", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, avgBy(trips, vehicleLabel, tripCost), "#b58a08"),
       chart("cost-duration", "งบเฉลี่ยตามจำนวนวัน", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, avgBy(trips, t => `${duration(t)} วัน`, tripCost).sort((a,b) => parseInt(a.label) - parseInt(b.label)), "#bd3763"),
       chart("cost-per-person", "งบเฉลี่ยต่อคน ตามขนาดกลุ่ม", `${estimateNote} · บาทต่อคน`, avgBy(trips, t => `${travelerCount(t)} คน`, perPerson).sort((a,b) => parseInt(a.label) - parseInt(b.label)), "#2b79d8"),
+      chart("cost-gender", "งบเฉลี่ยตามเพศของผู้วางแผน", `${estimateNote} · ${ownerNote}`, avgBy(trips, ownerGender, tripCost), "#bd3763"),
+      chart("cost-age", "งบเฉลี่ยตามช่วงอายุของผู้วางแผน", `${estimateNote} · อายุ ณ วันสิ้นสุดช่วงที่เลือก`, byAge, "#ed561e"),
+      chart("cost-job", "งบเฉลี่ยตามอาชีพ · 10 อันดับ", `${estimateNote} · ${ownerNote}`, avgBy(trips, ownerJob, tripCost, 10), "#2b79d8"),
+      chart("cost-home", "งบเฉลี่ยตามจังหวัดบ้านเกิด · 10 อันดับ", `${estimateNote} · ${ownerNote}`, avgBy(trips, ownerHome, tripCost, 10), "#0d9b80"),
+      chart("cost-companion", "งบเฉลี่ยตามกลุ่มผู้ร่วมเดินทาง", `${estimateNote} · เฉลี่ยต่อทริป · บาท`, byCompanion, "#7952c7"),
+      chart("cost-companion-person", "งบต่อคนต่อวัน ตามกลุ่มผู้ร่วมเดินทาง", `${estimateNote} · ปรับตามจำนวนคนและจำนวนวัน ใช้เทียบข้ามกลุ่มได้ตรงกว่า`, avgBy(trips, companion, perPersonDay), "#b58a08"),
+      chart("cost-purpose", "งบเฉลี่ยตามโอกาสเดินทาง", `${estimateNote} · แผนเก่าที่ยังไม่มีข้อมูลจะอยู่ในกลุ่มไม่ระบุ`, avgBy(trips, purposeLabel, tripCost), "#bd3763"),
+      chart("cost-style", "งบเฉลี่ยตามแนวเที่ยวที่เลือก", `${estimateNote} · หนึ่งทริปเลือกได้หลายแนว จึงนับซ้ำได้`, avgBy(tripInterests, x => x.style, x => tripCost(x.trip)), "#0d9b80"),
       chart("lodging-price", "ราคาที่พักต่อคืนในแผน", `${estimateNote} · จำนวนคืน`, count(nightPrices.map(priceBand)).sort(byBand(PRICE_BANDS)), "#0d9b80"),
       chart("booking-platform", "ช่องทางจองที่พักที่เลือก", "จากรายการจองในแผนที่บันทึก · จำนวนคืน", count(bookings.map(b => labelMap({ agoda: "Agoda", booking: "Booking.com", airbnb: "Airbnb", direct: "จองตรงกับที่พัก", other: "ยังไม่เลือกช่องทาง" }, b.platform))), "#7952c7"),
       chart("booking-status", "สถานะการจองที่พัก", "todo/opened = ยังไม่ยืนยัน · booked = ผู้ใช้กรอกว่าจองแล้ว", count(bookings.map(b => labelMap({ todo: "ยังไม่จอง", opened: "เปิดเว็บจองแล้ว", booked: "จองแล้ว", skipped: "ไม่จอง / จัดการเอง" }, b.status))), "#b58a08"),
@@ -205,6 +229,8 @@ export function buildDashboard(input: ReportInput, range: { from: string; to: st
     metric("สัดส่วนค่าน้ำมัน", totalCost ? totalFuel / totalCost * 100 : null, "ของมูลค่าแผนรวม", "%"),
     metric("ค่าใช้จ่ายเฉลี่ย / กม.", avg(trips.map(t => { const km = t.route_summary?.distance_km; return numeric(km) && km > 0 ? tripCost(t) / km : null; }).filter(numeric)), "รวมทุกหมวด หารด้วยระยะทางตามแผน", " ฿"),
     metric("ราคาที่พักเฉลี่ย / คืน", avg(nightPrices), `${nightPrices.length} คืนในแผนที่บันทึก`, " ฿"),
+    metric("กลุ่มผู้ร่วมเดินทางที่ใช้จ่ายสูงสุด", topGroup(byCompanion), "เฉลี่ยต่อทริป · ดูจำนวนทริปของกลุ่มในกราฟด้านล่าง"),
+    metric("ช่วงอายุที่ใช้จ่ายสูงสุด", topGroup(byAge), "เฉลี่ยต่อทริป · เฉพาะเจ้าของแผนที่กรอกวันเกิด"),
     metric("ราคาที่จองจริงเฉลี่ย / คืน", avg(bookedPrices), `${bookedPrices.length} คืนที่ผู้ใช้กรอกว่าจองแล้ว`, " ฿"),
   ];
   const liquidTrips = trips.filter(t => t.vehicle.fuel && !["ngv","ev"].includes(t.vehicle.fuel));
