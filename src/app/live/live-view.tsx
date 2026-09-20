@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, LocateFixed, MapPin, Navigation, RefreshCw, RotateCcw } from "lucide-react";
+import { CheckCircle2, ChevronDown, LocateFixed, MapPin, Navigation, RefreshCw, RotateCcw } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -93,6 +93,7 @@ export function LiveView({ initialTrip }: { initialTrip: LiveTrip | null }) {
   const [working, setWorking] = useState(false);
   const [stopIndex, setStopIndex] = useState(() => firstPendingStop(initialTrip));
   const [replanning, setReplanning] = useState<Stop | null>(null);
+  const [expandedCompletedDays, setExpandedCompletedDays] = useState<Set<string>>(() => new Set());
   const watchId = useRef<number | null>(null);
 
   useEffect(() => {
@@ -267,10 +268,31 @@ export function LiveView({ initialTrip }: { initialTrip: LiveTrip | null }) {
               })
               .map((item) => item.id);
             const activeItemId = day.items.find((item) => stopOrder.get(item.id) === stopIndex)?.id ?? null;
+            const dayStops = day.items.filter((item) => item.place && item.kind !== "drive");
+            // A planning-day `finished` flag only means the itinerary was edited.
+            // Collapse only after every real stop has been completed or skipped in live mode.
+            const dayComplete = dayStops.length > 0 && dayStops.every((item) => completedItemIds.includes(item.id));
+            const collapsed = dayComplete && !expandedCompletedDays.has(day.id);
             return (
             <section key={day.id} className="overflow-hidden rounded-card border-2 border-foreground bg-surface shadow-hard">
-              <header className="border-b-2 border-foreground bg-surface-2 px-4 py-3"><h3 className="text-base font-bold">วันที่ {day.index + 1} · {thaiDate(day.date)}</h3></header>
-              <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
+              <header className={`bg-surface-2 px-4 py-3 ${collapsed ? "" : "border-b-2 border-foreground"}`}>
+                <button
+                  type="button"
+                  disabled={!dayComplete}
+                  onClick={() => setExpandedCompletedDays((current) => {
+                    const next = new Set(current);
+                    if (next.has(day.id)) next.delete(day.id); else next.add(day.id);
+                    return next;
+                  })}
+                  className={`flex w-full items-center gap-2 text-left ${dayComplete ? "cursor-pointer" : "cursor-default"}`}
+                  aria-expanded={!collapsed}
+                >
+                  <h3 className="text-base font-bold">วันที่ {day.index + 1} · {thaiDate(day.date)}</h3>
+                  {dayComplete && <span className="rounded-full bg-secondary-soft px-2 py-0.5 text-xs font-bold text-secondary">เสร็จแล้ว</span>}
+                  {dayComplete && <ChevronDown className={`ml-auto size-4 text-subtle transition-transform ${collapsed ? "-rotate-90" : ""}`} aria-hidden="true" />}
+                </button>
+              </header>
+              {!collapsed && <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
                 <div id={`live-day-items-${day.id}`} className="min-w-0 lg:border-r-[1.5px] lg:border-border">
                   <ol className="divide-y divide-dashed divide-border px-4">{day.items.map((item) => {
                 const order = stopOrder.get(item.id);
@@ -291,7 +313,7 @@ export function LiveView({ initialTrip }: { initialTrip: LiveTrip | null }) {
                     matchHeightTo={`live-day-items-${day.id}`}
                   />
                 </aside>
-              </div>
+              </div>}
             </section>
             );
           })}
