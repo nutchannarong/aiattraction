@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { safeNext } from "@/lib/safe-next";
-import { FacebookIcon } from "@/components/facebook-icon";
 import { GoogleIcon } from "@/components/google-icon";
 import { buttonClass } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { StickerCard } from "@/components/ui/sticker-card";
 import { MOCK_EMAIL, MOCK_PASSWORD } from "@/lib/mock-auth";
 import { getCurrentUser } from "@/lib/supabase-server";
-import { signIn, signInAsDemo, signInWithFacebook, signInWithGoogle, signUp } from "./actions";
+import { signIn, signInAsDemo, signInWithGoogle, signUp } from "./actions";
 import { PasswordField } from "./password-field";
 
 export const metadata: Metadata = { title: "เข้าสู่ระบบ" };

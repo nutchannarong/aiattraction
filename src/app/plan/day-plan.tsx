@@ -52,25 +52,25 @@ export function ItemRow({ item, actions }: { item: PlanItem; actions?: ReactNode
       </p>
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-sm">
-          <Icon className="size-3.5 flex-none" aria-hidden="true" />
+          {!isDrive && <Icon className="size-3.5 flex-none" aria-hidden="true" />}
           <span className={cn(!isDrive && "font-semibold")}>
             {item.place?.name ?? item.activity}
           </span>
           {item.place?.isSecondaryCity && <Badge tone="brand">เมืองรอง</Badge>}
         </p>
-        <p className="mt-0.5 text-xs text-subtle">
-          {[
-            item.place ? item.activity : null,
-            item.place?.area,
-            item.driveKm ? `${item.driveKm} กม.` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-        {item.openingHours && <p className="text-xs text-subtle">เวลาเปิด: {item.openingHours}</p>}
-        {item.phone && <p className="text-xs text-subtle">โทร {item.phone}</p>}
-        {item.parking && <p className="text-xs text-subtle">ที่จอดรถ: {item.parking}</p>}
-        {item.notes && <p className="text-xs text-subtle">{item.notes}</p>}
+        {!isDrive && (
+          <>
+            <p className="mt-0.5 text-xs text-subtle">
+              {[item.place ? item.activity : null, item.place?.area, item.driveKm ? `${item.driveKm} กม.` : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            {item.openingHours && <p className="text-xs text-subtle">เวลาเปิด: {item.openingHours}</p>}
+            {item.phone && <p className="text-xs text-subtle">โทร {item.phone}</p>}
+            {item.parking && <p className="text-xs text-subtle">ที่จอดรถ: {item.parking}</p>}
+            {item.notes && <p className="text-xs text-subtle">{item.notes}</p>}
+          </>
+        )}
         {item.lodging && (
           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
             {item.lodging.platform && (

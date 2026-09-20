@@ -237,7 +237,7 @@ export function DayEditor({
             )}
 
             <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.85fr)]">
-              <div className="min-w-0 lg:border-r-[1.5px] lg:border-border">
+              <div id={`day-items-${day.index}`} className="min-w-0 lg:border-r-[1.5px] lg:border-border">
                 <ul className="px-4 py-1">
                   {day.items.length === 0 && (
                     <li className="py-4 text-sm text-subtle">
@@ -354,7 +354,8 @@ export function DayEditor({
                       : undefined
                   }
                   onSelectAlternative={replanning ? pickReplacement : undefined}
-                  className={replanning ? "lg:h-72 lg:flex-none" : "h-72 lg:h-full"}
+                  className={replanning ? "lg:h-72 lg:flex-none" : "h-72 lg:h-[36rem]"}
+                  matchHeightTo={replanning ? undefined : `day-items-${day.index}`}
                 />
                 {replanning && (
                   <div className="max-h-[32rem] touch-pan-y overflow-y-auto overscroll-contain border-t border-border p-3">

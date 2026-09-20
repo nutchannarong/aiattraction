@@ -10,6 +10,8 @@ export type LocalTrip = {
   savedAt: string;
   draft: PlannerDraft;
   plan: TripPlan;
+  /** Persisted when a local trip enters or finishes live navigation. */
+  status?: "upcoming" | "active" | "done";
 };
 
 export function readLocalTrips(): LocalTrip[] {

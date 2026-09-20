@@ -33,6 +33,8 @@ function TripStatus({ days }: { days: number }) {
 function localSummary(trip: LocalTrip): TripSummary {
   const first = trip.plan.days[0];
   const last = trip.plan.days[trip.plan.days.length - 1];
+  const stopCount = trip.plan.days.reduce((count, day) => count + day.items.filter((item) => item.kind !== "drive" && item.place).length, 0);
+  const progress = typeof window === "undefined" ? 0 : Number(localStorage.getItem(`thainhaidee:live-progress:${trip.id}`));
   return {
     id: trip.id,
     source: "local",
@@ -42,11 +44,11 @@ function localSummary(trip: LocalTrip): TripSummary {
     startDate: first.date,
     endDate: last.date,
     dayCount: trip.plan.days.length,
-    stopCount: trip.plan.days.reduce((count, day) => count + day.items.filter((item) => item.kind !== "drive" && item.place).length, 0),
+    stopCount,
     distanceKm: trip.plan.totals.distanceKm,
     fuelCost: trip.plan.totals.fuelCost,
     vehicleLabel: vehicleTypeInfo(trip.draft.vehicle.type).label,
-    status: "upcoming",
+    status: stopCount > 0 && Number.isInteger(progress) && progress >= stopCount ? "done" : trip.status ?? "upcoming",
   };
 }
 
@@ -71,6 +73,56 @@ export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
     for (const trip of initialTrips) byId.set(trip.id, trip);
     return [...byId.values()].filter((trip) => !hidden.includes(trip.id)).toSorted((a, b) => a.startDate.localeCompare(b.startDate));
   }, [hidden, initialTrips, localTrips]);
+  const upcomingTrips = trips.filter((trip) => trip.status !== "done" && daysUntil(trip.endDate) >= 0);
+  const completedTrips = trips.filter((trip) => trip.status === "done" || daysUntil(trip.endDate) < 0);
+
+  const tripCard = (trip: TripSummary, completed = false) => (
+    <article
+      key={trip.id}
+      className={`grid items-center gap-3 rounded-[13px] border-2 p-4 sm:grid-cols-[1fr_auto] ${
+        completed ? "border-border bg-surface-2 text-subtle opacity-65 grayscale" : "border-foreground bg-surface shadow-hard"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-base font-bold">{trip.originLabel} → {trip.destinationLabel}</h2>
+          {completed ? (
+            <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-bold">เดินทางแล้ว</span>
+          ) : (
+            <TripStatus days={daysUntil(trip.startDate)} />
+          )}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-subtle sm:text-sm">
+          {thaiDate(trip.startDate)} – {thaiDate(trip.endDate)} · {trip.dayCount} วัน · {trip.stopCount} จุด · {trip.vehicleLabel} · {Math.round(trip.distanceKm).toLocaleString("th-TH")} กม. · ค่าน้ำมัน {Math.round(trip.fuelCost).toLocaleString("th-TH")} ฿
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {!completed && <Button onClick={() => {
+          if (trip.source === "local") {
+            setActiveLocalTrip(trip.id);
+            router.push("/live");
+          } else router.push(`/live?trip=${trip.id}`);
+        }}>
+          <Navigation className="size-4" aria-hidden="true" /> เริ่มแผน
+        </Button>}
+        <Button variant="ghost" disabled={deleting} onClick={() => {
+          if (!window.confirm(`ลบแผน ${trip.originLabel} → ${trip.destinationLabel}?`)) return;
+          startDeleting(async () => {
+            if (trip.source === "supabase") {
+              const result = await deleteTrip(trip.id);
+              if ("error" in result) return void window.alert(result.error);
+            }
+            deleteLocalTrip(trip.id);
+            setLocalTrips((current) => current.filter((item) => item.id !== trip.id));
+            setHidden((current) => [...current, trip.id]);
+            router.refresh();
+          });
+        }}>
+          {deleting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />} ลบ
+        </Button>
+      </div>
+    </article>
+  );
 
   if (!loaded) return <div className="h-48 animate-pulse rounded-card border-2 border-foreground bg-surface" />;
   if (!trips.length)
@@ -82,45 +134,17 @@ export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
     );
 
   return (
-    <div className="space-y-3">
-      {trips.map((trip) => (
-        <article key={trip.id} className="grid items-center gap-3 rounded-[13px] border-2 border-foreground bg-surface p-4 shadow-hard sm:grid-cols-[1fr_auto]">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-bold">{trip.originLabel} → {trip.destinationLabel}</h2>
-              <TripStatus days={daysUntil(trip.startDate)} />
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-subtle sm:text-sm">
-              {thaiDate(trip.startDate)} – {thaiDate(trip.endDate)} · {trip.dayCount} วัน · {trip.stopCount} จุด · {trip.vehicleLabel} · {Math.round(trip.distanceKm).toLocaleString("th-TH")} กม. · ค่าน้ำมัน {Math.round(trip.fuelCost).toLocaleString("th-TH")} ฿
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => {
-              if (trip.source === "local") {
-                setActiveLocalTrip(trip.id);
-                router.push("/live");
-              } else router.push(`/live?trip=${trip.id}`);
-            }}>
-              <Navigation className="size-4" aria-hidden="true" /> เริ่มแผน
-            </Button>
-            <Button variant="ghost" disabled={deleting} onClick={() => {
-              if (!window.confirm(`ลบแผน ${trip.originLabel} → ${trip.destinationLabel}?`)) return;
-              startDeleting(async () => {
-                if (trip.source === "supabase") {
-                  const result = await deleteTrip(trip.id);
-                  if ("error" in result) return void window.alert(result.error);
-                }
-                deleteLocalTrip(trip.id);
-                setLocalTrips((current) => current.filter((item) => item.id !== trip.id));
-                setHidden((current) => [...current, trip.id]);
-                router.refresh();
-              });
-            }}>
-              {deleting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />} ลบ
-            </Button>
-          </div>
-        </article>
-      ))}
+    <div className="space-y-7">
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold">ทริปที่กำลังจะถึง</h2>
+        {upcomingTrips.length ? upcomingTrips.map((trip) => tripCard(trip)) : <p className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-subtle">ยังไม่มีทริปที่กำลังจะถึง</p>}
+      </section>
+      {completedTrips.length > 0 && (
+        <section className="space-y-3 border-t border-dashed border-border pt-5">
+          <h2 className="text-sm font-bold text-subtle">เดินทางครบแล้ว</h2>
+          {completedTrips.map((trip) => tripCard(trip, true))}
+        </section>
+      )}
     </div>
   );
 }

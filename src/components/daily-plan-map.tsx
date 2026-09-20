@@ -4,7 +4,7 @@ import L from "leaflet";
 import { ExternalLink, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 import type { PlanPlace } from "@/lib/planner/plan-types";
 
 type Point = {
@@ -14,6 +14,8 @@ type Point = {
   latitude: number;
   longitude: number;
 };
+
+type RoadRouteResponse = { coordinates: [number, number][] };
 
 type Props = {
   day: {
@@ -28,7 +30,8 @@ type Props = {
   /** Live-trip state; omitted when editing a draft itinerary. */
   activeItemId?: string | null;
   completedItemIds?: string[];
-  currentPosition?: { latitude: number; longitude: number; accuracy: number } | null;
+  /** Desktop-only: keep map height equal to the adjacent daily-item list. */
+  matchHeightTo?: string;
 };
 
 const iconCache = new Map<string, L.DivIcon>();
@@ -95,23 +98,6 @@ function FitPoints({ points, fullscreen }: { points: Point[]; fullscreen: boolea
   return null;
 }
 
-/** Leaflet reads its size only when it mounts. Keep it in sync with responsive grids. */
-function KeepMapSized() {
-  const map = useMap();
-  useEffect(() => {
-    const container = map.getContainer();
-    const resize = () => map.invalidateSize({ pan: false });
-    const observer = new ResizeObserver(resize);
-    observer.observe(container);
-    const timer = window.setTimeout(resize, 0);
-    return () => {
-      window.clearTimeout(timer);
-      observer.disconnect();
-    };
-  }, [map]);
-  return null;
-}
-
 function googleMapsRoute(points: Point[]) {
   if (points.length === 0) return null;
   if (points.length === 1) {
@@ -127,6 +113,56 @@ function googleMapsRoute(points: Point[]) {
   return `https://www.google.com/maps/dir/?api=1&origin=${first.latitude},${first.longitude}&destination=${last.latitude},${last.longitude}&travelmode=driving${middle ? `&waypoints=${encodeURIComponent(middle)}` : ""}`;
 }
 
+function useRoadGeometry(points: Point[], enabled: boolean) {
+  const key = useMemo(
+    () => points.map((point) => `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`).join(";"),
+    [points],
+  );
+  const [geometry, setGeometry] = useState<[number, number][] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || !key.includes(";")) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setGeometry(null);
+      fetch("/api/daily-route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          points: key
+            .split(";")
+            .slice(0, 20)
+            .map((coordinate) => {
+              const [lat, lng] = coordinate.split(",").map(Number);
+              return { lat, lng };
+            }),
+        }),
+        signal: controller.signal,
+      })
+        .then(async (response) => (response.ok ? (response.json() as Promise<RoadRouteResponse>) : null))
+        .then((route) => {
+          if (route?.coordinates?.length) setGeometry(route.coordinates);
+        })
+        .catch(() => {
+          // A straight dotted fallback remains visible when the public router is unavailable.
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [enabled, key]);
+
+  return { geometry, loading };
+}
+
 export default function DailyPlanMap({
   day,
   start,
@@ -135,10 +171,35 @@ export default function DailyPlanMap({
   className = "",
   activeItemId = null,
   completedItemIds = [],
-  currentPosition = null,
+  matchHeightTo,
 }: Props) {
   const mapWrapper = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [matchedHeight, setMatchedHeight] = useState<number | null>(null);
+  // Leaflet owns the DOM node it mounts into. A fresh key prevents Next Fast
+  // Refresh from attempting to attach a second Leaflet instance to that node.
+  const [mapEpoch, setMapEpoch] = useState(0);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMapEpoch((epoch) => epoch + 1));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!matchHeightTo) return;
+    const target = document.getElementById(matchHeightTo);
+    const media = window.matchMedia("(min-width: 1024px)");
+    if (!target) return;
+    // Keep a useful map canvas on short days, while longer lists still dictate the height.
+    const update = () => setMatchedHeight(media.matches ? Math.max(420, Math.ceil(target.getBoundingClientRect().height)) : null);
+    const observer = new ResizeObserver(update);
+    observer.observe(target);
+    media.addEventListener("change", update);
+    update();
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", update);
+    };
+  }, [matchHeightTo]);
   const points = useMemo(() => {
     const raw: Point[] = [];
     if (start) {
@@ -183,6 +244,7 @@ export default function DailyPlanMap({
   );
   const shownPoints = alternativeMode ? alternativePoints : points;
   const routeUrl = alternativeMode ? null : googleMapsRoute(points);
+  const { geometry: roadGeometry, loading: loadingRoad } = useRoadGeometry(points, !alternativeMode);
   useEffect(() => {
     const syncFullscreen = () => setFullscreen(document.fullscreenElement === mapWrapper.current);
     document.addEventListener("fullscreenchange", syncFullscreen);
@@ -207,8 +269,10 @@ export default function DailyPlanMap({
     <div
       ref={mapWrapper}
       className={`relative min-h-72 overflow-hidden bg-surface-2 ${fullscreen ? "h-dvh w-dvw" : ""} ${className}`}
+      style={!fullscreen && matchedHeight ? { height: matchedHeight } : undefined}
     >
       <MapContainer
+        key={`${day.index}-${alternativeMode ? "alternatives" : "route"}-${fullscreen}-${mapEpoch}`}
         center={[shownPoints[0].latitude, shownPoints[0].longitude]}
         zoom={12}
         scrollWheelZoom={false}
@@ -218,12 +282,16 @@ export default function DailyPlanMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <KeepMapSized />
         <FitPoints points={shownPoints} fullscreen={fullscreen} />
         {!alternativeMode && points.length > 1 && (
           <Polyline
-            positions={points.map((p) => [p.latitude, p.longitude])}
-            pathOptions={{ color: "#f4622e", weight: 4, opacity: 0.85, dashArray: "8 6" }}
+            positions={roadGeometry ?? points.map((p) => [p.latitude, p.longitude])}
+            pathOptions={{
+              color: "#f4622e",
+              weight: 4,
+              opacity: 0.85,
+              dashArray: roadGeometry ? undefined : "8 6",
+            }}
           />
         )}
         {shownPoints.map((point, index) => (
@@ -259,15 +327,6 @@ export default function DailyPlanMap({
             </Popup>
           </Marker>
         ))}
-        {currentPosition && !alternativeMode && (
-          <CircleMarker
-            center={[currentPosition.latitude, currentPosition.longitude]}
-            radius={8}
-            pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }}
-          >
-            <Popup>ตำแหน่งล่าสุดของคุณ (ความแม่นยำประมาณ {Math.round(currentPosition.accuracy)} ม.)</Popup>
-          </CircleMarker>
-        )}
       </MapContainer>
       <button
         type="button"
@@ -292,6 +351,11 @@ export default function DailyPlanMap({
         <div className="absolute bottom-3 left-3 z-[500] inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-hard-sm">
           <span className="size-2 animate-pulse rounded-full bg-accent motion-reduce:animate-none" aria-hidden="true" />
           กำลังอัปเดตเส้นทาง
+        </div>
+      )}
+      {loadingRoad && !alternativeMode && (
+        <div className="absolute left-3 top-3 z-[500] rounded-full border border-border bg-surface/95 px-2.5 py-1 text-[11px] font-semibold shadow-hard-sm">
+          กำลังคำนวณเส้นทางตามถนน…
         </div>
       )}
     </div>
