@@ -1,11 +1,18 @@
 "use client";
 
 import { Loader2, Navigation, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { StickerCard } from "@/components/ui/sticker-card";
-import { deleteLocalTrip, type LocalTrip, readLocalTrips, setActiveLocalTrip } from "@/lib/local-trips";
+import {
+  clearAllLocalTrips,
+  deleteLocalTrip,
+  type LocalTrip,
+  readLocalTrips,
+  setActiveLocalTrip,
+} from "@/lib/local-trips";
 import { vehicleTypeInfo } from "@/lib/planner/vehicles";
 import type { TripSummary } from "@/lib/trip-data";
 import { deleteTrip } from "./actions";
@@ -52,7 +59,13 @@ function localSummary(trip: LocalTrip): TripSummary {
   };
 }
 
-export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
+export function TripsView({
+  initialTrips,
+  isAuthenticated = true,
+}: {
+  initialTrips: TripSummary[];
+  isAuthenticated?: boolean;
+}) {
   const router = useRouter();
   const [localTrips, setLocalTrips] = useState<LocalTrip[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -61,18 +74,26 @@ export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setLocalTrips(readLocalTrips());
+      if (!isAuthenticated) {
+        clearAllLocalTrips();
+        setLocalTrips([]);
+      } else {
+        setLocalTrips(readLocalTrips());
+      }
       setLoaded(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [isAuthenticated]);
 
   const trips = useMemo(() => {
+    if (!isAuthenticated) return [];
     const byId = new Map<string, TripSummary>();
     for (const trip of localTrips) byId.set(trip.id, localSummary(trip));
     for (const trip of initialTrips) byId.set(trip.id, trip);
-    return [...byId.values()].filter((trip) => !hidden.includes(trip.id)).toSorted((a, b) => a.startDate.localeCompare(b.startDate));
-  }, [hidden, initialTrips, localTrips]);
+    return [...byId.values()]
+      .filter((trip) => !hidden.includes(trip.id))
+      .toSorted((a, b) => a.startDate.localeCompare(b.startDate));
+  }, [hidden, initialTrips, localTrips, isAuthenticated]);
   const upcomingTrips = trips.filter((trip) => trip.status !== "done" && daysUntil(trip.endDate) >= 0);
   const completedTrips = trips.filter((trip) => trip.status === "done" || daysUntil(trip.endDate) < 0);
 
@@ -108,14 +129,28 @@ export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
         <Button variant="ghost" disabled={deleting} onClick={() => {
           if (!window.confirm(`ลบแผน ${trip.originLabel} → ${trip.destinationLabel}?`)) return;
           startDeleting(async () => {
+            let serverError: string | null = null;
             if (trip.source === "supabase") {
-              const result = await deleteTrip(trip.id);
-              if ("error" in result) return void window.alert(result.error);
+              try {
+                const result = await deleteTrip(trip.id);
+                if ("error" in result) {
+                  serverError = result.error;
+                }
+              } catch (err) {
+                console.error("Delete trip failed:", err);
+                serverError = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง";
+              }
             }
+            // Always clean up locally so cached or ghost trips are never stuck
             deleteLocalTrip(trip.id);
             setLocalTrips((current) => current.filter((item) => item.id !== trip.id));
             setHidden((current) => [...current, trip.id]);
-            router.refresh();
+
+            if (serverError) {
+              window.alert(serverError);
+            } else {
+              router.refresh();
+            }
           });
         }}>
           {deleting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />} ลบ
@@ -125,6 +160,26 @@ export function TripsView({ initialTrips }: { initialTrips: TripSummary[] }) {
   );
 
   if (!loaded) return <div className="h-48 animate-pulse rounded-card border-2 border-foreground bg-surface" />;
+
+  if (!isAuthenticated) {
+    return (
+      <StickerCard className="px-5 py-14 text-center">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-full border-2 border-foreground bg-secondary-soft text-secondary shadow-hard-sm">
+          <Navigation className="size-7" aria-hidden="true" />
+        </div>
+        <h2 className="mt-4 text-xl font-bold">เข้าสู่ระบบเพื่อดูแผนของคุณ</h2>
+        <p className="mx-auto mt-2 max-w-[44ch] text-sm text-subtle">
+          แผนการเดินทางที่บันทึกไว้จะผูกกับบัญชีของคุณ เพื่อให้คุณเปิดดูและนำทางได้จากทุกอุปกรณ์
+        </p>
+        <div className="mt-6 flex justify-center">
+          <Link href="/login?next=/trips" className={buttonClass("cta")}>
+            เข้าสู่ระบบ / สมัครสมาชิก
+          </Link>
+        </div>
+      </StickerCard>
+    );
+  }
+
   if (!trips.length)
     return (
       <StickerCard className="px-5 py-14 text-center text-subtle">

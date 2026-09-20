@@ -50,13 +50,44 @@ async function tripDayIds(
   return (data ?? []).map((day) => day.id as string);
 }
 
-export async function deleteTrip(tripId: string) {
-  const owned = await ownedTrip(tripId);
-  if (!owned) return { error: "ไม่พบแผนหรือไม่มีสิทธิ์ลบ" };
-  const { error } = await owned.supabase.from("trips").delete().eq("id", owned.tripId);
-  if (error) return { error: "ลบแผนไม่สำเร็จ กรุณาลองใหม่" };
+export type DeleteTripResult =
+  | { ok: true; notFound?: boolean }
+  | { error: string };
+
+export async function deleteTrip(tripId: string): Promise<DeleteTripResult> {
+  const parsed = uuid.safeParse(tripId);
+  if (!parsed.success) {
+    return { ok: true, notFound: true };
+  }
+  const supabase = await createAuthClient();
+  const { data: auth } = await supabase.auth.getClaims();
+  if (!auth?.claims) {
+    return { ok: true, notFound: true };
+  }
+
+  const { data: trip } = await supabase
+    .from("trips")
+    .select("id")
+    .eq("id", parsed.data)
+    .eq("user_id", auth.claims.sub)
+    .maybeSingle();
+
+  if (!trip) {
+    return { ok: true, notFound: true };
+  }
+
+  const { error } = await supabase
+    .from("trips")
+    .delete()
+    .eq("id", parsed.data)
+    .eq("user_id", auth.claims.sub);
+
+  if (error) {
+    console.error("deleteTrip Supabase error:", error);
+    return { error: "ลบแผนไม่สำเร็จ กรุณาลองใหม่" };
+  }
   revalidatePath("/trips");
-  return { ok: true as const };
+  return { ok: true };
 }
 
 export async function setTripItemProgress(

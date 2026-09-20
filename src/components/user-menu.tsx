@@ -1,6 +1,6 @@
 import { CircleUserRound } from "lucide-react";
 import Link from "next/link";
-import { signOut } from "@/app/login/actions";
+import { SignOutButton } from "./sign-out-button";
 import { buttonClass } from "@/components/ui/button";
 import { getMyProfile } from "@/lib/profile";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -30,9 +30,7 @@ export async function UserMenu() {
         <span className="hidden truncate sm:inline">{name}</span>
         <span className="sr-only sm:hidden">โปรไฟล์ของฉัน</span>
       </Link>
-      <form action={signOut}>
-        <button className={buttonClass("ghost", "min-h-10 px-3.5 text-[13px]")}>ออกจากระบบ</button>
-      </form>
+      <SignOutButton />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/supabase-server";
 import { getMyTripSummaries } from "@/lib/trips-server";
 import { NewTripButton } from "./new-trip-button";
 import { TripsView } from "./trips-view";
@@ -6,7 +7,8 @@ import { TripsView } from "./trips-view";
 export const metadata: Metadata = { title: "แผนของฉัน" };
 
 export default async function TripsPage() {
-  const trips = await getMyTripSummaries();
+  const user = await getCurrentUser();
+  const trips = user ? await getMyTripSummaries() : [];
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-card border-2 border-foreground bg-surface shadow-hard">
@@ -30,10 +32,12 @@ export default async function TripsPage() {
           </p>
         </div>
       </section>
-      <TripsView initialTrips={trips} />
-      <div className="flex justify-center pt-2">
-        <NewTripButton />
-      </div>
+      <TripsView initialTrips={trips} isAuthenticated={Boolean(user)} />
+      {user && (
+        <div className="flex justify-center pt-2">
+          <NewTripButton />
+        </div>
+      )}
     </div>
   );
 }

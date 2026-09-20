@@ -50,3 +50,20 @@ export function readActiveLocalTrip() {
   const trips = readLocalTrips();
   return trips.find((trip) => trip.id === id) ?? trips[0] ?? null;
 }
+
+export function clearAllLocalTrips() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(LOCAL_TRIPS_KEY);
+    localStorage.removeItem(ACTIVE_TRIP_KEY);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("thainhaidee:live-progress:") || key === "thainhaidee:active-trip")) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* ignore storage access errors */
+  }
+  window.dispatchEvent(new Event(LOCAL_TRIPS_CHANGED));
+}
