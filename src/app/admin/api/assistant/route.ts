@@ -122,9 +122,11 @@ export async function POST(request: Request) {
       try {
         send({ type: "status", message: "กำลังวิเคราะห์ข้อมูล…" });
 
+        const adminModel = process.env.OPENROUTER_ADMIN_MODEL || AI_MODEL;
+
         const completion = await getAi().chat.completions.create(
           {
-            model: AI_MODEL,
+            model: adminModel,
             messages: history,
             stream: true,
             max_tokens: 1800,
