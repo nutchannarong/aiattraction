@@ -38,6 +38,7 @@ export type PlannerProps = {
   groups: PlaceGroupOption[];
   fuelPrices: FuelPrice[];
   homeProvince: PlaceRef | null;
+  autoLocateOrigin?: boolean;
   /** "ask": offer to continue a half-made plan · "resume": back from sign-in · "new": start clean. */
   entry: "ask" | "resume" | "new";
 };
@@ -73,7 +74,7 @@ export function missingForPlan(d: PlannerDraft): string | null {
   return null;
 }
 
-export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry }: PlannerProps) {
+export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry, autoLocateOrigin = false }: PlannerProps) {
   const router = useRouter();
   // "?new=1": forget what's stored before the hooks below restore it (idempotent, client only).
   useState(() => {
@@ -85,7 +86,7 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry 
   const [chatKey, setChatKey] = useState(0);
   const { draft, patch, reset } = usePlannerDraft(initialDraft);
   const [open, setOpen] = useState<number | null>(1);
-  const { saved, startOptions, choose, replaceOption, editPlan, markSaved, clear } = useSavedPlan();
+  const { saved, startOptions, choose, replaceOption, editPlan, clear } = useSavedPlan();
   const [requested, setRequested] = useState<PlannerDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -159,7 +160,7 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry 
     {
       title: "จะไปไหน เมื่อไร",
       summary: whereSummary(draft),
-      body: <StepWhere draft={draft} patch={patch} homeProvince={homeProvince} />,
+      body: <StepWhere draft={draft} patch={patch} homeProvince={homeProvince} autoLocateOrigin={autoLocateOrigin} />,
     },
     {
       title: "เดินทางไปกับใคร",
@@ -279,7 +280,11 @@ export function Planner({ initialDraft, groups, fuelPrices, homeProvince, entry 
             onRecalculate={recalculate}
             onPlanChange={editPlan}
             tripId={saved.tripId}
-            onSaved={markSaved}
+            onSaved={() => {
+              // Once it is a real trip, it is no longer a resumable browser draft.
+              clear();
+              clearPlannerStorage();
+            }}
             addRequest={addRequest}
             onAddRequest={setAddRequest}
             options={saved.options ?? []}

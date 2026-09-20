@@ -3,7 +3,7 @@
 import { useEffect, useReducer, useRef } from "react";
 import type { TripPlan } from "@/lib/planner/plan-types";
 import type { PlannerDraft, RouteStyle } from "@/lib/planner/types";
-import { PLANNER_PLAN_KEY } from "./storage-keys";
+import { PLANNER_DRAFT_KEY, PLANNER_PLAN_KEY } from "./storage-keys";
 
 /** One drafted route style, offered side by side so the user can pick. */
 export type PlanOption = { style: RouteStyle; plan: TripPlan };
@@ -92,6 +92,13 @@ export function useSavedPlan() {
       const raw = localStorage.getItem(PLANNER_PLAN_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as SavedPlan;
+      // Older saves may have left the browser draft behind. A persisted trip must
+      // never be restored as a half-finished planner session.
+      if (parsed?.tripId) {
+        localStorage.removeItem(PLANNER_PLAN_KEY);
+        localStorage.removeItem(PLANNER_DRAFT_KEY);
+        return;
+      }
       if (parsed?.version === 1 && parsed.plan?.days?.length)
         dispatch({ type: "set", value: parsed });
     } catch {

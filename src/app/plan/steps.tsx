@@ -65,7 +65,8 @@ export function StepWhere({
   draft,
   patch,
   homeProvince,
-}: StepProps & { homeProvince: PlaceRef | null }) {
+  autoLocateOrigin = false,
+}: StepProps & { homeProvince: PlaceRef | null; autoLocateOrigin?: boolean }) {
   const days = daysBetween(draft.startDate, draft.endDate);
   const today = todayIso();
   return (
@@ -75,6 +76,7 @@ export function StepWhere({
           label="ออกเดินทางจาก"
           value={draft.origin}
           onChange={(origin) => patch({ origin })}
+          autoLocate={autoLocateOrigin}
         />
         <PlacePicker
           label="จะไปที่ไหน"

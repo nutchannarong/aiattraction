@@ -1,6 +1,7 @@
 import { Car, MapPinned, Route, Wallet } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { HomeRecommendations } from "@/components/home-recommendations";
 import { buttonClass } from "@/components/ui/button";
 import { StickerCard } from "@/components/ui/sticker-card";
 import { countAttractions } from "@/lib/attractions";
@@ -70,6 +71,8 @@ export default async function Home() {
           ))}
         </ol>
       </section>
+
+      <HomeRecommendations />
 
       <section className="grid gap-3.5 md:grid-cols-3">
         <div>

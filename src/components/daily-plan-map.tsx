@@ -268,8 +268,8 @@ export default function DailyPlanMap({
   return (
     <div
       ref={mapWrapper}
-      className={`relative min-h-72 overflow-hidden bg-surface-2 ${fullscreen ? "h-dvh w-dvw" : ""} ${className}`}
-      style={!fullscreen && matchedHeight ? { height: matchedHeight } : undefined}
+      className={`relative isolate min-h-72 overflow-hidden bg-surface-2 ${fullscreen ? "h-dvh w-dvw" : ""} ${className}`}
+      style={!fullscreen && matchHeightTo && matchedHeight ? { height: matchedHeight } : undefined}
     >
       <MapContainer
         key={`${day.index}-${alternativeMode ? "alternatives" : "route"}-${fullscreen}-${mapEpoch}`}
@@ -331,7 +331,7 @@ export default function DailyPlanMap({
       <button
         type="button"
         onClick={() => void toggleFullscreen()}
-        className="absolute right-3 top-3 z-[500] inline-flex size-9 items-center justify-center rounded-full border-2 border-foreground bg-surface text-foreground shadow-hard-sm hover:bg-surface-2"
+        className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-full border-2 border-foreground bg-surface text-foreground shadow-hard-sm hover:bg-surface-2"
         aria-label={fullscreen ? "ออกจากโหมดเต็มจอ" : "ขยายแผนที่เต็มจอ"}
         title={fullscreen ? "ออกจากเต็มจอ" : "ขยายเต็มจอ"}
       >
@@ -342,19 +342,19 @@ export default function DailyPlanMap({
           href={routeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute bottom-3 right-3 z-[500] inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 border-foreground bg-surface px-3 text-xs font-bold shadow-hard-sm hover:bg-surface-2"
+          className="absolute bottom-3 right-3 z-10 inline-flex min-h-9 items-center gap-1.5 rounded-full border-2 border-foreground bg-surface px-3 text-xs font-bold shadow-hard-sm hover:bg-surface-2"
         >
           <ExternalLink className="size-3.5" aria-hidden="true" /> เปิดเส้นทางวันนี้ใน Google Maps
         </a>
       )}
       {activeItemId && !alternativeMode && (
-        <div className="absolute bottom-3 left-3 z-[500] inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-hard-sm">
+        <div className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-hard-sm">
           <span className="size-2 animate-pulse rounded-full bg-accent motion-reduce:animate-none" aria-hidden="true" />
           กำลังอัปเดตเส้นทาง
         </div>
       )}
       {loadingRoad && !alternativeMode && (
-        <div className="absolute left-3 top-3 z-[500] rounded-full border border-border bg-surface/95 px-2.5 py-1 text-[11px] font-semibold shadow-hard-sm">
+        <div className="absolute left-3 top-3 z-10 rounded-full border border-border bg-surface/95 px-2.5 py-1 text-[11px] font-semibold shadow-hard-sm">
           กำลังคำนวณเส้นทางตามถนน…
         </div>
       )}

@@ -60,6 +60,7 @@ export function PlacePicker({
   near,
   suggestions = [],
   placeholder = "พิมพ์จังหวัด อำเภอ หรือชื่อสถานที่",
+  autoLocate = false,
 }: {
   label: string;
   value: PlaceRef | null;
@@ -67,6 +68,7 @@ export function PlacePicker({
   near?: LatLng | null;
   suggestions?: { label: string; place: PlaceRef }[];
   placeholder?: string;
+  autoLocate?: boolean;
 }) {
   const listId = useId();
   const [query, setQuery] = useState("");
@@ -79,6 +81,10 @@ export function PlacePicker({
   const [pinning, setPinning] = useState(false);
   const { state: geo, locate } = useGeolocation();
   const handledFix = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (autoLocate && !value && geo.status === "idle") void locate();
+  }, [autoLocate, geo.status, locate, value]);
 
   // Only show results for what is currently typed.
   const results = query.trim().length >= 2 && found.q === query.trim() ? found.items : [];

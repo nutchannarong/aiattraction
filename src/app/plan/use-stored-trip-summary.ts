@@ -12,6 +12,7 @@ type StoredDraft = {
 type StoredPlan = {
   draft?: StoredDraft;
   plan?: { days?: unknown[] };
+  tripId?: string | null;
   options?: unknown[];
   updatedAt?: string;
 };
@@ -31,6 +32,7 @@ function read(key: string) {
  */
 function snapshot(): string | null {
   const plan = read(PLANNER_PLAN_KEY) as StoredPlan | null;
+  if (plan?.tripId) return null;
   const draft = (plan?.draft ?? read(PLANNER_DRAFT_KEY)) as StoredDraft | null;
   const from = draft?.origin?.label;
   const to = draft?.destination?.label;

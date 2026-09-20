@@ -20,6 +20,10 @@ function ageBucket(age: number): AdultAge | null {
   return null;
 }
 
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   const params = await searchParams;
   const entry = params.new === "1" ? "new" : params.resume === "1" ? "resume" : "ask";
@@ -39,6 +43,24 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
   }
 
   const home = provinces.find((p) => p.id === profile?.home_province_id);
+  const provinceRef = (name: string | undefined): PlaceRef | null => {
+    const province = provinces.find((item) => item.name_th === name);
+    if (!province || province.latitude == null || province.longitude == null) return null;
+    return {
+      type: "province",
+      id: province.id,
+      label: province.name_th,
+      sublabel: province.region_th,
+      latitude: province.latitude,
+      longitude: province.longitude,
+      provinceId: province.id,
+      isSecondaryCity: province.is_secondary_city,
+    };
+  };
+  const presetOrigin = provinceRef(first(params.from));
+  const presetDestination = provinceRef(first(params.to));
+  if (presetOrigin) draft.origin = presetOrigin;
+  if (presetDestination) draft.destination = presetDestination;
   const homeProvince: PlaceRef | null =
     home && home.latitude != null && home.longitude != null
       ? {
@@ -71,6 +93,7 @@ export default async function PlanPage({ searchParams }: PageProps<"/plan">) {
         fuelPrices={fuelPrices}
         homeProvince={homeProvince}
         entry={entry}
+        autoLocateOrigin={params.gps === "1"}
       />
     </div>
   );
