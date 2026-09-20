@@ -1,18 +1,29 @@
-// Best-effort per-instance limit so one visitor can't run up the OpenRouter bill.
-// Serverless instances don't share memory, so this slows abuse rather than stopping it;
-// set a spending limit on the OpenRouter key as the real cap.
+import "server-only";
+import { createAuthClient } from "@/lib/supabase-server";
+import { adminDatabase } from "@/lib/admin/database";
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 30;
-const hits = new Map<string, number[]>();
+function denied(error: string, status: number) {
+  return Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+}
 
-/** True when this caller has made too many AI requests recently (all AI endpoints count). */
-export function rateLimited(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  hits.set(ip, recent);
-  if (hits.size > 5000) hits.clear();
-  return recent.length > MAX_PER_WINDOW;
+/** Reserve the maximum model calls before starting paid work. Fail closed. */
+export async function authorizeAi(modelCalls: number): Promise<Response | null> {
+  try {
+    const auth = await createAuthClient();
+    const { data, error } = await auth.auth.getUser();
+    if (error || !data.user || data.user.is_anonymous) {
+      return denied("กรุณาเข้าสู่ระบบก่อนใช้ผู้ช่วย AI", 401);
+    }
+    const db = adminDatabase();
+    if (!db) return denied("ผู้ช่วย AI ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง", 503);
+    const { data: allowed, error: quotaError } = await db.rpc("consume_ai_quota", {
+      p_user: data.user.id, p_model_calls: modelCalls,
+    });
+    if (quotaError || typeof allowed !== "boolean") {
+      return denied("ผู้ช่วย AI ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง", 503);
+    }
+    return allowed ? null : denied("ใช้โควตา AI ครบแล้ว กรุณาลองใหม่ภายหลัง", 429);
+  } catch {
+    return denied("ผู้ช่วย AI ไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง", 503);
+  }
 }

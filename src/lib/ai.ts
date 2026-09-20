@@ -1,4 +1,6 @@
+import "server-only";
 import OpenAI from "openai";
+import { AI_SAFETY_POLICY, requireSafeAiData } from "./assistant/safety";
 
 // OpenRouter speaks the OpenAI API. Server-only: the key must never reach the browser.
 
@@ -26,6 +28,9 @@ export function getAi(): OpenAI {
   client ??= new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
+    // A reserved quota unit must not produce additional automatic retries.
+    maxRetries: 0,
+    timeout: 55_000,
     defaultHeaders: {
       "HTTP-Referer": "https://thainhaidee.vercel.app",
       "X-Title": "Thainhaidee Travel Planner",
@@ -35,12 +40,13 @@ export function getAi(): OpenAI {
 }
 
 export async function generateTripHighlights(tripSummary: string) {
+  requireSafeAiData(tripSummary);
   const response = await getAi().chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: "system",
-        content: "คุณคือผู้ช่วยวางแผนเที่ยวไทยไหนดี แนะนำทริปให้น่าสนใจ สรุปกระชับ ภาษาเป็นกันเอง",
+        content: `คุณคือผู้ช่วยวางแผนเที่ยวไทยไหนดี แนะนำทริปให้น่าสนใจ สรุปกระชับ ภาษาเป็นกันเอง\n${AI_SAFETY_POLICY}`,
       },
       { role: "user", content: `ช่วยสรุปไฮไลท์และคำแนะนำสำหรับทริปนี้หน่อย: ${tripSummary}` },
     ],
@@ -48,5 +54,7 @@ export async function generateTripHighlights(tripSummary: string) {
     ...AI_REASONING,
   });
 
-  return response.choices[0].message.content;
+  const answer = response.choices[0].message.content;
+  requireSafeAiData(answer);
+  return answer;
 }

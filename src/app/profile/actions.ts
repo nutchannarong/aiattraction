@@ -1,14 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { safeNext } from "@/lib/safe-next";
 import { z } from "zod";
 import { getProvinces } from "@/lib/provinces";
 import { createAuthClient, getCurrentUser } from "@/lib/supabase-server";
-
-function safeNext(value: FormDataEntryValue | null) {
-  const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "";
-}
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(2, "กรุณากรอกชื่อ-นามสกุล").max(100, "ชื่อยาวเกินไป"),
@@ -25,7 +21,7 @@ export async function saveProfile(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/profile");
 
-  const next = safeNext(formData.get("next"));
+  const next = safeNext(formData.get("next"), "");
   const back = (params: Record<string, string>) =>
     `/profile?${new URLSearchParams({ ...params, ...(next ? { next } : {}) })}`;
 
